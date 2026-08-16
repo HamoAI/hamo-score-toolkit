@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hamo-score"
+version = "0.1.0.dev0"
+description = "Client toolkit and safety scaffold for the HamoAI/hamo-score-0.6b conversational pulse-taking model"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.9"
+authors = [{ name = "Hamo AI" }]
+keywords = ["mental-wellness", "affect-scoring", "AWEHB", "hamo"]
+
+[project.optional-dependencies]
+transformers = ["transformers>=4.51", "torch"]
+
+[project.urls]
+Model = "https://huggingface.co/HamoAI/hamo-score-0.6b"
+Homepage = "https://github.com/HamoAI/hamo-score-toolkit"
+
+[tool.setuptools.packages.find]
+where = ["src"]

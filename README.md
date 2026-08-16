@@ -1,0 +1,88 @@
+# hamo-score-toolkit
+
+**EN** | [中文](#中文)
+
+Client toolkit and **safety scaffold** for [HamoAI/hamo-score-0.6b](https://huggingface.co/HamoAI/hamo-score-0.6b) —
+the little model that takes a conversational pulse (AWEHB: Agency / Withdrawal / Extremity / Hostility / Boundary).
+
+This repo is the missing half of the model: the exact prompt format, tolerant
+output parsing, the smoothing-and-buckets math the scores are designed to feed,
+and — front and center — the **crisis gate** that the model license
+([HAMO-RAIL-S §3c](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/LICENSE))
+requires upstream of the model in any consumer-facing deployment.
+
+> ⚠️ The model is not a chatbot, not a diagnostic instrument, and **not a
+> crisis detector**. This toolkit makes the safe integration pattern the easy one.
+
+## 5-minute start (ollama)
+
+```bash
+# 1. get the model (one-time)
+hf download HamoAI/hamo-score-0.6b gguf/hamo-score-0.6b-v61.q8.gguf --local-dir /tmp/hamo
+ollama create hamo-score-0.6b -f server/Modelfile
+
+# 2. install the toolkit
+pip install "git+https://github.com/HamoAI/hamo-score-toolkit.git"
+```
+
+```python
+from hamo_score import OllamaClient, score_message, update_stress, energy_state
+
+client = OllamaClient(model="hamo-score-0.6b")
+r = score_message(client, "虽然还是有点提不起劲，不过今天把拖了两周的体检约上了",
+                  history=[{"role": "assistant", "content": "这周过得怎么样？"}])
+
+if r.crisis.triggered:          # deterministic gate ran BEFORE the model
+    route_to_human(r.crisis.matched)
+elif r.scores:
+    print(r.scores)             # {'A': 2.5, 'W': 0.5, 'E': 0.0, 'H': 0.0, 'B': 1.0}
+    stress = update_stress(r.scores, current_stress=3.0)
+    print(energy_state(stress)) # 'positive' / 'negative' / 'neurotic'
+```
+
+That's the whole intended shape: **gate → score → smooth → bucket**. Scores are
+per-message signals; never act on a single raw score.
+
+## What's in the box
+
+| Module | What it gives you |
+|---|---|
+| `hamo_score.prompt` | The one true prompt format + built-in trimming guards (3×200-char turns, 500-char message) |
+| `hamo_score.parse` | Think-block-tolerant JSON parsing, grid snapping |
+| `hamo_score.client` | `OllamaClient` / `TransformersClient` + `score_message()` safe pipeline |
+| `hamo_score.stress` | Reference smoothing (`0.8·history + 0.2·message`) + energy-state buckets |
+| `hamo_score.safety` | `CrisisGate` (zh/en word lists, extensible) + AI-disclosure texts |
+
+Design notes worth reading before integrating: the model card's
+[Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation) and
+[Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)
+sections — including why the reference scorer's own self-consistency (94–98%)
+is the practical ceiling.
+
+## Disagree with a score?
+
+Open an issue with the **score disagreement** template (message + model score +
+what you think it should be). Disagreement reports feed the human gold-label
+program that steers future versions.
+
+## License
+
+Toolkit code: **Apache-2.0**. Model weights: **HAMO-RAIL-S 1.0** (free use with
+four restrictions — no standalone clinical determinations, no consequential
+decisions about individuals, keep independent upstream crisis handling + AI
+disclosure in consumer deployments, no re-identification). Using this toolkit's
+default pipeline satisfies the crisis-handling pattern by construction.
+
+---
+
+# 中文
+
+[hamo-score-0.6b](https://huggingface.co/HamoAI/hamo-score-0.6b) 的客户端工具包与**安全脚手架**——给对话把脉的小模型（AWEHB 五维：行动力/退缩/极端化/敌意/边界）。
+
+这个仓库是模型的另一半：唯一正确的提示词格式、容错解析、分数该喂进去的平滑折算与状态桶，以及放在最前面的**危机闸门**——模型许可证（HAMO-RAIL-S §3c）要求任何面向消费者的部署都必须在模型上游保留独立的确定性危机处理，本工具包让「合规的接法」成为「最省事的接法」。
+
+**五分钟上手**：见上方英文段——`hf download` 拉 GGUF → `ollama create` → `pip install` → 四行代码跑通 **闸门 → 评分 → 平滑 → 状态桶** 完整链路。切记：分数是逐句信号，永远不要凭单句原始分做任何决定。
+
+**对某个评分不服？** 用 issue 里的「评分分歧」模板提交（消息 + 模型分 + 你认为的分）——分歧报告会进入人类金标计划，直接影响后续版本。
+
+**许可证**：工具包代码 Apache-2.0；模型权重 HAMO-RAIL-S 1.0（自由使用附四条限制，用本工具包默认管线即天然满足危机处理条款）。

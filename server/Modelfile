@@ -1,0 +1,12 @@
+FROM /tmp/hamo/gguf/hamo-score-0.6b-v61.q8.gguf
+TEMPLATE """<|im_start|>user
+{{ .Prompt }}<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+"""
+PARAMETER temperature 0
+PARAMETER num_predict 80
+PARAMETER stop <|im_end|>
