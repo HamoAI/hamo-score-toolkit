@@ -88,6 +88,12 @@ checkpoint selection with a crisis-miss column, and the acceptance hard gate.
 | `hamo_score.stress` | Reference smoothing (`0.8·history + 0.2·message`) + energy-state buckets |
 | `hamo_score.safety` | `CrisisGate` (zh/en word lists, extensible) + AI-disclosure texts |
 
+More docs: the [integration guide](docs/integration.md) (the correct wiring +
+the ten-point don't list), the [FAQ](docs/faq.md), and the
+[fine-tuning playbook](docs/finetune.md). Runnable examples in
+[`examples/`](examples): quickstart, batch CSV scoring, and a session-monitor
+demo with the crisis short-circuit (both take `--mock` to run without a model).
+
 Design notes worth reading before integrating: the model card's
 [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation) and
 [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)
@@ -123,6 +129,8 @@ default pipeline satisfies the crisis-handling pattern by construction.
 **部署自检**：`python eval/run_exam.py`——195 题合成考卷（教师标注，零真实数据）+ 10 条手写危机闸门用例，对照 [eval/README.md](eval/README.md) 的官方参考带（JSON 合法率 100%、维度级 84.0%、闸门 10/10）验证你的部署接线正确。
 
 **想微调到你自己的人群？** 读 [docs/finetune.md](docs/finetune.md)——五代模型蒸出来的完整打法（含两代拒收与确切原因）：数据红线、真实 LoRA 配方、带危机漏检列的选点表、验收硬闸。
+
+**更多文档**：[集成指南](docs/integration.md)（正确接线 + 十条禁令）、[FAQ](docs/faq.md)、[微调指南](docs/finetune.md)；[`examples/`](examples) 里有可跑的批量打分与会话监测演示（带 `--mock`，无模型也能看管线）。
 
 **对某个评分不服？** 用 issue 里的「评分分歧」模板提交（消息 + 模型分 + 你认为的分）——分歧报告会进入人类金标计划，直接影响后续版本。
 
