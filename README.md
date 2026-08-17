@@ -43,6 +43,34 @@ elif r.scores:
 That's the whole intended shape: **gate → score → smooth → bucket**. Scores are
 per-message signals; never act on a single raw score.
 
+## One-command server (Docker)
+
+No Python integration needed — run the whole pipeline as an HTTP service:
+
+```bash
+git clone https://github.com/HamoAI/hamo-score-toolkit.git && cd hamo-score-toolkit/server
+docker compose up          # downloads the GGUF (639MB, one-time), creates + warms the model
+```
+
+```bash
+curl -s localhost:8080/score -H 'content-type: application/json' \
+  -d '{"message": "最近总觉得撑不太住", "current_stress": 3.0}'
+# → {"crisis": {...}, "scores": {"A":..}, "stress": 3.1, "energy_state": "positive", "latency_ms": ...}
+```
+
+`POST /score` runs gate → score → smooth → bucket; crisis-gated requests never
+reach the model. `GET /healthz` probes the model end-to-end.
+
+## Verify your deployment
+
+A 195-question synthetic exam (teacher-labeled, zero real data) plus 10
+handwritten crisis-gate cases. Run it against your own deployment and compare
+with the official reference band in [eval/README.md](eval/README.md):
+
+```bash
+python eval/run_exam.py    # reference: JSON 100%, dim-level 84.0%, gate 10/10
+```
+
 ## What's in the box
 
 | Module | What it gives you |
@@ -82,6 +110,10 @@ default pipeline satisfies the crisis-handling pattern by construction.
 这个仓库是模型的另一半：唯一正确的提示词格式、容错解析、分数该喂进去的平滑折算与状态桶，以及放在最前面的**危机闸门**——模型许可证（HAMO-RAIL-S §3c）要求任何面向消费者的部署都必须在模型上游保留独立的确定性危机处理，本工具包让「合规的接法」成为「最省事的接法」。
 
 **五分钟上手**：见上方英文段——`hf download` 拉 GGUF → `ollama create` → `pip install` → 四行代码跑通 **闸门 → 评分 → 平滑 → 状态桶** 完整链路。切记：分数是逐句信号，永远不要凭单句原始分做任何决定。
+
+**一键服务器**：`cd server && docker compose up`——自动拉 GGUF、建模型、预热，`POST localhost:8080/score` 直接返回 危机/五维分/压力值/状态桶，危机命中的请求永远不会碰到模型。
+
+**部署自检**：`python eval/run_exam.py`——195 题合成考卷（教师标注，零真实数据）+ 10 条手写危机闸门用例，对照 [eval/README.md](eval/README.md) 的官方参考带（JSON 合法率 100%、维度级 84.0%、闸门 10/10）验证你的部署接线正确。
 
 **对某个评分不服？** 用 issue 里的「评分分歧」模板提交（消息 + 模型分 + 你认为的分）——分歧报告会进入人类金标计划，直接影响后续版本。
 

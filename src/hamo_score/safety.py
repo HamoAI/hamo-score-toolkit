@@ -20,9 +20,11 @@ ZH_CRISIS = [
     "遗书", "了结", "解脱了", "永远消失",
 ]
 EN_CRISIS = [
-    "suicide", "kill myself", "end my life", "self-harm", "self harm",
-    "hurt myself", "cut myself", "don't want to live", "dont want to live",
-    "better off dead", "overdose", "end it all",
+    "suicide", "kill myself", "killing myself", "end my life", "ending my life",
+    "take my own life", "taking my own life", "self-harm", "self harm",
+    "hurt myself", "hurting myself", "cut myself", "cutting myself",
+    "don't want to live", "dont want to live", "want to die", "wanna die",
+    "better off dead", "overdose", "end it all", "ending it all",
 ]
 
 DISCLOSURE_ZH = "我是 AI 支持工具，不是执业治疗师。如果你正处于危机中，请立即联系当地的危机热线或专业人员。"
