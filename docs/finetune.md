@@ -147,11 +147,10 @@ Training rows are chat-format JSONL, one per line, as consumed by `mlx-lm`:
 Build the user content with `hamo_score.build_prompt` so the train-time
 prompt and the serve-time prompt are **byte-identical** — including the
 trimming guards (3 turns × 200 chars context, 500-char message). Any drift
-between the two is silent out-of-distribution at serve time. The toolkit
-installs straight from GitHub (it is not on PyPI yet):
+between the two is silent out-of-distribution at serve time.
 
 ```bash
-pip install "git+https://github.com/HamoAI/hamo-score-toolkit.git"
+pip install hamo-score
 ```
 
 ```python
@@ -557,8 +556,7 @@ is not a failure statistic — it is the evidence the process works.
 
 mlx-lm 聊天格式 JSONL，user 内容**必须**用 `hamo_score.build_prompt` 构造
 （训练与推理提示词逐字节一致，截短护栏一并生效；工具包安装：
-`pip install "git+https://github.com/HamoAI/hamo-score-toolkit.git"`，尚未上
-PyPI）；assistant 内容是单个 JSON
+`pip install hamo-score`）；assistant 内容是单个 JSON
 对象：五键、一位小数、0.5 网格，无任何多余文字。
 
 ```json

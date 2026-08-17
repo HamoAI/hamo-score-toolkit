@@ -22,7 +22,7 @@ hf download HamoAI/hamo-score-0.6b gguf/hamo-score-0.6b-v61.q8.gguf --local-dir 
 ollama create hamo-score-0.6b -f server/Modelfile
 
 # 2. install the toolkit
-pip install "git+https://github.com/HamoAI/hamo-score-toolkit.git"
+pip install hamo-score
 ```
 
 ```python
