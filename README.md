@@ -71,6 +71,13 @@ with the official reference band in [eval/README.md](eval/README.md):
 python eval/run_exam.py    # reference: JSON 100%, dim-level 84.0%, gate 10/10
 ```
 
+## Adapting it to your own population
+
+Read [docs/finetune.md](docs/finetune.md) — the five-generation fine-tuning
+playbook, including the two generations we rejected for crisis-recall
+regressions and exactly why. Data red lines first, then the real LoRA recipe,
+checkpoint selection with a crisis-miss column, and the acceptance hard gate.
+
 ## What's in the box
 
 | Module | What it gives you |
@@ -107,13 +114,15 @@ default pipeline satisfies the crisis-handling pattern by construction.
 
 [hamo-score-0.6b](https://huggingface.co/HamoAI/hamo-score-0.6b) 的客户端工具包与**安全脚手架**——给对话把脉的小模型（AWEHB 五维：行动力/退缩/极端化/敌意/边界）。
 
-这个仓库是模型的另一半：唯一正确的提示词格式、容错解析、分数该喂进去的平滑折算与状态桶，以及放在最前面的**危机闸门**——模型许可证（HAMO-RAIL-S §3c）要求任何面向消费者的部署都必须在模型上游保留独立的确定性危机处理，本工具包让「合规的接法」成为「最省事的接法」。
+这个仓库是模型的另一半：唯一正确的提示词格式、容错解析、分数该喂进去的平滑折算与状态桶，以及放在最前面的**危机闸门**——模型许可证（HAMO-RAIL-S §3c）要求任何面向消费者的心理健康部署都必须在模型上游保留独立的危机处理，本工具包让「合规的接法」成为「最省事的接法」。
 
 **五分钟上手**：见上方英文段——`hf download` 拉 GGUF → `ollama create` → `pip install` → 四行代码跑通 **闸门 → 评分 → 平滑 → 状态桶** 完整链路。切记：分数是逐句信号，永远不要凭单句原始分做任何决定。
 
 **一键服务器**：`cd server && docker compose up`——自动拉 GGUF、建模型、预热，`POST localhost:8080/score` 直接返回 危机/五维分/压力值/状态桶，危机命中的请求永远不会碰到模型。
 
 **部署自检**：`python eval/run_exam.py`——195 题合成考卷（教师标注，零真实数据）+ 10 条手写危机闸门用例，对照 [eval/README.md](eval/README.md) 的官方参考带（JSON 合法率 100%、维度级 84.0%、闸门 10/10）验证你的部署接线正确。
+
+**想微调到你自己的人群？** 读 [docs/finetune.md](docs/finetune.md)——五代模型蒸出来的完整打法（含两代拒收与确切原因）：数据红线、真实 LoRA 配方、带危机漏检列的选点表、验收硬闸。
 
 **对某个评分不服？** 用 issue 里的「评分分歧」模板提交（消息 + 模型分 + 你认为的分）——分歧报告会进入人类金标计划，直接影响后续版本。
 

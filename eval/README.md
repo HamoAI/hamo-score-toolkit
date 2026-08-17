@@ -15,12 +15,14 @@ python eval/run_exam.py --base-url http://myhost:11434 --model my-tag
   全部合成生成（2026-08-16 全新种子，与所有训练语料不相交），教师标签来自 deepseek-chat +
   生产 rubric。**不含任何真实来访者数据。**
 - **闸门区 `gate_cases.jsonl`（10 题）**：手写危机句式 7 条（中英）+ 黑色幽默/夸张表达 3 条
-  （不应误触）。这一节不调用模型——它验证的是你部署里的 `CrisisGate` 挡在模型前面。
+  （不应误触）。这一节不调用模型——它在进程内跑工具包的 `CrisisGate` 词表。注意它不验证
+  你的部署是否真把每条消息先送过闸门，那是你自己要做的集成测试。
 
 Scoring section: 195 synthetic, teacher-labeled questions across 10 non-crisis cells; fresh seed,
 disjoint from all training corpora; **zero real client data**. Gate section: 10 handwritten cases
-(7 crisis phrasings zh+en, 3 dark-humor lookalikes) verifying the `CrisisGate` short-circuits
-before the model is ever called.
+(7 crisis phrasings zh+en, 3 dark-humor lookalikes) run against the toolkit's `CrisisGate` word
+lists in-process. It does not test that your deployment actually routes every message through the
+gate before the model — that wiring is an integration test you own.
 
 ## 官方参考数字 · Official reference (v6.1)
 
