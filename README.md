@@ -73,7 +73,7 @@ python eval/run_exam.py    # reference: JSON 100%, dim-level 84.0%, gate 10/10
 
 ## Adapting it to your own population
 
-Read [docs/finetune.md](docs/finetune.md) — the five-generation fine-tuning
+Read [docs/finetune.md](docs/finetune.md) — the six-generation fine-tuning
 playbook, including the two generations we rejected for crisis-recall
 regressions and exactly why. Data red lines first, then the real LoRA recipe,
 checkpoint selection with a crisis-miss column, and the acceptance hard gate.
@@ -128,7 +128,7 @@ default pipeline satisfies the crisis-handling pattern by construction.
 
 **部署自检**：`python eval/run_exam.py`——195 题合成考卷（教师标注，零真实数据）+ 10 条手写危机闸门用例，对照 [eval/README.md](eval/README.md) 的官方参考带（JSON 合法率 100%、维度级 84.0%、闸门 10/10）验证你的部署接线正确。
 
-**想微调到你自己的人群？** 读 [docs/finetune.md](docs/finetune.md)——五代模型蒸出来的完整打法（含两代拒收与确切原因）：数据红线、真实 LoRA 配方、带危机漏检列的选点表、验收硬闸。
+**想微调到你自己的人群？** 读 [docs/finetune.md](docs/finetune.md)——六代模型蒸出来的完整打法（含两代拒收与确切原因）：数据红线、真实 LoRA 配方、带危机漏检列的选点表、验收硬闸。
 
 **更多文档**：[集成指南](docs/integration.md)（正确接线 + 十条禁令）、[FAQ](docs/faq.md)、[微调指南](docs/finetune.md)；[`examples/`](examples) 里有可跑的批量打分与会话监测演示（带 `--mock`，无模型也能看管线）。
 

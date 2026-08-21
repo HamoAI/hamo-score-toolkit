@@ -60,7 +60,7 @@ different paper whose job is to certify *your wiring*, not the model —
 what matters is landing inside the 81–86% band.
 
 **Can I fine-tune it on my own data?**
-Yes — [docs/finetune.md](finetune.md) is the full five-generation playbook,
+Yes — [docs/finetune.md](finetune.md) is the full six-generation playbook,
 data red lines first. Your fine-tuned weights remain under HAMO-RAIL-S (the
 guide's §8 covers what you owe).
 
@@ -118,7 +118,7 @@ JSON 常常还没吐出来就被截断：等着你的是解析失败，不只是
 453 条真实终评卷（永不出门）；随包的是另一张合成卷，任务是认证**你的接线**——
 落在 81–86% 合格带内即正确。
 
-**能用自己的数据微调吗？** 能——[微调指南](finetune.md)是完整五代打法，数据
+**能用自己的数据微调吗？** 能——[微调指南](finetune.md)是完整六代打法，数据
 红线在最前。微调出的权重仍受 HAMO-RAIL-S 约束（指南 §8）。
 
 **评分不服怎么办？** 可能你是对的！被替换的参照评分器自己重打同句也有 2–6%

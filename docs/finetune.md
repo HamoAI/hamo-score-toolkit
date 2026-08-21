@@ -482,7 +482,7 @@ and stay inside the four use restrictions — then you are square.
 
 ---
 
-## Appendix: five generations at a glance
+## Appendix: six generations at a glance
 
 | Generation | What changed | Outcome |
 |---|---|---|
@@ -492,6 +492,12 @@ and stay inside the four use restrictions — then you are square.
 | v5 | synthetic patch cells with a W-cap admission gate | **rejected** — crisis misses 2–3× worse; taught us the distress-adjacent W-cap rule |
 | v6 | +440 real turns, incumbent's labels unscreened | **rejected** — 3 crisis-artifact rows in training, misses 5 → 9; taught us R2 |
 | v6.1 (released) | same 440 real turns, teacher labels, crisis-artifact screening | shipped — dim 85.6%, decision 96.2%, crisis misses 4 |
+
+Those six adjudicated generations sit on top of about ten actual training
+runs — pilots, restarts, and a same-size rerun or two that never earned a row
+here, plus one run on a student three times larger that gained roughly a point
+and was dropped. Budget for that ratio: you will train more often than you
+will ship.
 
 The pattern worth copying is not any single number. It is that every
 generation faced the same exam, the exam never entered training, and the
@@ -506,7 +512,7 @@ is not a failure statistic — it is the evidence the process works.
 
 你从 HuggingFace 下载了
 [hamo-score-0.6b](https://huggingface.co/HamoAI/hamo-score-0.6b)，想用**经
-授权的**自有数据把它适配到你的人群、语域或语言。本文是我们五代模型（含两代
+授权的**自有数据把它适配到你的人群、语域或语言。本文是我们六代模型（含两代
 拒收）蒸馏出来的操作手册。先立框架：它是**测量仪器**——不是聊天机器人、不是
 诊断工具、不是治疗师，也**不是危机检测器**。危机处理由模型上游的确定性闸门
 （`CrisisGate`）负责——这是许可证 HAMO-RAIL-S §3(c) 对面向消费者的心理健康
@@ -631,11 +637,13 @@ v5 和 v6 两代。接真实流量先跑**影子模式**，切换标准预注册
 源仓库指引发布、闸门挡在模型前面、披露 AI 身份、守住四条使用限制，你就是
 合规的。
 
-### 附：五代小史
+### 附：六代小史
 
 v2 首蒸（维度 81）→ v3.x 配平（决策 96.8）→ v4 审计驱动重修数据（维度
 84.0，漏检 11→5）→ **v5 拒收**（W 上限准入闸门，漏检 2–3×）→ **v6 拒收**
 （3 条危机工件入训，漏检 5→9）→ **v6.1 发布**（440 条授权真实数据 + 工件
-筛查，维度 85.6、漏检 4）。值得复制的不是任何一个数字，而是流程本身：每代
+筛查，维度 85.6、漏检 4）。这六代定谳之下是约十次实际训练——试跑、重启、
+没能挣到一行表格的重训，外加一次三倍大学生的实验（只涨约一分，弃）。按这个
+比例做预算：训练的次数一定多于发布的次数。值得复制的不是任何一个数字，而是流程本身：每代
 考同一张考卷，考卷永不入训，验收标准在出分前写死。两次拒收不是事故率——
 是流程在起作用的证据。
