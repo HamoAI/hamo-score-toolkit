@@ -14,6 +14,12 @@ requires upstream of the model in any consumer-facing deployment.
 > ⚠️ The model is not a chatbot, not a diagnostic instrument, and **not a
 > crisis detector**. This toolkit makes the safe integration pattern the easy one.
 
+> 💬 **Think a score is wrong? Tell us — that's the most valuable thing you can send.**
+> [**Open a disagreement report →**](https://github.com/HamoAI/hamo-score-toolkit/issues/new?template=score_disagreement.md) (message + the model's score + the score you'd
+> give). Every report goes into the human gold-label program that steers the next version.
+> The reference scorer this model replaced disagrees with *itself* 2–6% of the time, so
+> "the model is wrong here" is a real finding, not a nuisance.
+
 ## 5-minute start (ollama)
 
 ```bash
@@ -100,11 +106,18 @@ Design notes worth reading before integrating: the model card's
 sections — including why the reference scorer's own self-consistency (94–98%)
 is the practical ceiling.
 
-## Disagree with a score?
+## Disagree with a score? (please tell us)
 
-Open an issue with the **score disagreement** template (message + model score +
-what you think it should be). Disagreement reports feed the human gold-label
-program that steers future versions.
+This is the one contribution we ask for. [**Open a disagreement report →**](https://github.com/HamoAI/hamo-score-toolkit/issues/new?template=score_disagreement.md)
+
+Useful reports carry three things: the **message** (redact freely — we don't want
+identifiable text), **the score the model gave**, and **the score you would give**.
+Context turns and your population/language help but are optional.
+
+Every report is triaged into the human gold-label program: where licensed
+practitioners disagree with the model at a rate above its own noise floor, that
+becomes a training-data gap for the next generation. Disagreements are how this
+model gets better; silent workarounds are how it stays wrong.
 
 ## License
 
@@ -132,6 +145,6 @@ default pipeline satisfies the crisis-handling pattern by construction.
 
 **更多文档**：[集成指南](docs/integration.md)（正确接线 + 十条禁令）、[FAQ](docs/faq.md)、[微调指南](docs/finetune.md)；[`examples/`](examples) 里有可跑的批量打分与会话监测演示（带 `--mock`，无模型也能看管线）。
 
-**对某个评分不服？** 用 issue 里的「评分分歧」模板提交（消息 + 模型分 + 你认为的分）——分歧报告会进入人类金标计划，直接影响后续版本。
+**对某个评分不服？请一定告诉我们——这是我们唯一请求的贡献。** [**提一条分歧报告 →**](https://github.com/HamoAI/hamo-score-toolkit/issues/new?template=score_disagreement.md)：给出「消息（可自由脱敏）+ 模型给的分 + 你认为该给的分」三样即可。每一条都会进入人类金标计划分诊：凡持牌从业者与模型的分歧率高过模型自身的噪声底噪，那就是下一代的训练数据缺口。被替换的那个参照评分器自己重打同一句都有 2–6% 不一致——所以「这里模型判错了」是真发现，不是打扰。
 
 **许可证**：工具包代码 Apache-2.0；模型权重 HAMO-RAIL-S 1.0（自由使用附四条限制，用本工具包默认管线即天然满足危机处理条款）。
