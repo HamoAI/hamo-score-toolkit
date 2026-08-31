@@ -10,3 +10,9 @@ TEMPLATE """<|im_start|>user
 PARAMETER temperature 0
 PARAMETER num_predict 80
 PARAMETER stop <|im_end|>
+# 必须显式中性化采样：ollama 默认 repeat_penalty=1.1 会惩罚重复 token，
+# 而本模型输出是 {"A": 0.0, "W": 0.0, ...} 这类高度重复结构——默认值会
+# 系统性把分数从 0 推高（实测造分率 13.5% → 25.0%）。
+PARAMETER repeat_penalty 1.0
+PARAMETER top_k 0
+PARAMETER top_p 1.0

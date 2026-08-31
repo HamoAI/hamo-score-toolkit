@@ -34,7 +34,7 @@ services:
           "model": "hamo-score-0.6b",
           "files": {"hamo-score-0.6b-v61.q8.gguf": "/models/hamo-score-0.6b-v61.q8.gguf"},
           "template": "<|im_start|>user\n{{ .Prompt }}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
-          "parameters": {"temperature": 0, "num_predict": 80, "stop": ["<|im_end|>"]}
+          "parameters": {"temperature": 0, "num_predict": 80, "stop": ["<|im_end|>"], "repeat_penalty": 1.0, "top_k": 0, "top_p": 1.0}
         }'
         echo "warmup..."
         curl -s http://ollama:11434/api/generate -d '{"model":"hamo-score-0.6b","prompt":"给来访者最新消息打分（AWEHB，0.0-3.0）。\n最新消息: 预热","stream":false,"keep_alive":-1}' > /dev/null

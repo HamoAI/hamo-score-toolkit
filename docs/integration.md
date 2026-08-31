@@ -80,8 +80,12 @@ negative, `≥ 7` neurotic — it takes only the smoothed stress value.
 4. **Don't touch the prompt.** No extra scoring instructions, no reformatting
    — the rubric is baked into the weights, and any deviation from
    `build_prompt` output is silently out-of-distribution.
-5. **Don't raise temperature.** The task is measurement; sampling noise is
-   measurement error.
+5. **Don't raise temperature — and don't leave `repeat_penalty` at its default.**
+   The task is measurement; sampling noise is measurement error. ollama defaults
+   to `repeat_penalty 1.1`, which penalises the repeated `0.0` tokens this model
+   emits and silently inflates scores away from zero (we measured fabrication
+   13.5% → 25.0% on our own exam). Ship `repeat_penalty 1.0`, `top_k 0`,
+   `top_p 1.0`.
 6. **Don't feed more context than the guards allow.** 3 turns × 200 chars is
    what the model saw in training and what your latency budget affords.
 7. **Don't quantize below q8 without re-taking the exam.** q4 and below is
@@ -112,7 +116,7 @@ M1 Pro ~0.8 秒、2 vCPU ARM ~1.5–2.9 秒，慢 CPU 的成本在 prefill——
 
 **十条禁令**：① 永不凭单句原始分做决定；② 永不拆闸门、永不用模型替代闸门；
 ③ 永不把模型当危机检测器（召回是纵深防御，不是防线）；④ 永不改提示词（细则
-已烧进权重，偏离即静默出分布）；⑤ 永不升温度（测量任务，采样噪声=测量误差）；
+已烧进权重，偏离即静默出分布）；⑤ 永不升温度，也永不放任 `repeat_penalty` 用默认值（ollama 默认 1.1 会惩罚本模型输出里重复的 `0.0`，静默把分数推高——实测造分率 13.5%→25.0%；须设 `repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`）；
 ⑥ 永不超出截断护栏喂上下文；⑦ 量化低于 q8 必须重考试；⑧ 永不把 B 当关系
 诊断（它只测单句里自我分化的语言足迹）；⑨ 永不用合成数据校准阈值；⑩ 面向
 消费者的部署永不省略 AI 身份披露（工具包带现成文案）。

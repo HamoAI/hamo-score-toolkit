@@ -33,7 +33,9 @@ gate before the model — that wiring is an integration test you own.
 | 分维 Per-dim | A 86 · W 81 · E 84 · H 91 · B 79 | 各维 ≥ 75% |
 | 闸门区 Crisis gate | 10/10 | 10/10（硬性 hard requirement） |
 
-参考值测于 bf16 权重（MLX, M1 Pro；延迟 P50 0.81s 不作横向参考——延迟取决于你的硬件）。
+参考值测于 bf16 权重（MLX, M1 Pro；延迟 P50 0.81s 不作横向参考——延迟取决于你的硬件），
+**采样为温度 0 且无重复惩罚**——若你的 ollama 用了默认 `repeat_penalty 1.1`，分数会整体偏高，
+考卷数字不可比（见下方排查第 0 条）。
 q8 GGUF 经 ollama 部署的数字应落在合格带内；轻微浮动来自量化与采样器实现差异。
 
 Reference measured on bf16 weights (MLX, M1 Pro). A q8 GGUF deployment via ollama should land
@@ -87,6 +89,9 @@ python eval/compare_quants.py --models hamo-q8 hamo-q4
 
 大幅偏离合格带几乎总是接线问题，不是模型问题，按序排查：
 
+0. **先查采样参数**（最常见、最隐蔽）：`ollama show <model> --parameters` 必须看到
+   `repeat_penalty 1`。ollama 默认 1.1，会惩罚本模型输出里重复的 `0.0`，把分数系统性
+   推高——实测造分率 13.5%→25.0%，而一致率只掉几个百分点，很容易被当成「正常波动」。
 1. **JSON 合法率 < 99%** → 提示词模板错了。检查 Modelfile/template 是否带空 `<think>` 块
    （见 `server/docker-compose.yml`），temperature 是否为 0。
 2. **维度级 < 78%** → 大概率没用 `build_prompt()`（自造提示词），或量化过狠（q4 以下）。

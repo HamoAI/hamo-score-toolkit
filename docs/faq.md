@@ -10,9 +10,19 @@ recommended `num_predict 80` cap the JSON is often cut off before it appears,
 so expect parse failures, not just latency. This is the #1 wiring mistake;
 copy [`server/Modelfile`](../server/Modelfile) as-is.
 
-**Why temperature 0?**
+**Why temperature 0 — and why must I also neutralise `repeat_penalty`?**
 Scoring is measurement. Sampling noise is measurement error, and the 0.5 grid
-gives it nowhere useful to go. All official numbers are measured at 0.
+gives it nowhere useful to go. All official numbers are measured at temperature 0
+**with no repetition penalty**.
+
+This second half bites hard and silently. **ollama defaults to
+`repeat_penalty 1.1`**, and this model's output — `{"A": 0.0, "W": 0.0, "E": 0.0,
+"H": 0.0, "B": 0.0}` — is deliberately repetitive. Penalising repeated tokens
+pushes scores *away from 0*, i.e. it fabricates signal. We measured it on our own
+300-question discrimination exam: fabrication rate **13.5% → 25.0%**, and
+boundary sign-flips (a `0.0` scored `≥2.0`) **6 → 10**. The weights were fine;
+the runtime was not. Always ship `repeat_penalty 1.0`, `top_k 0`, `top_p 1.0` —
+[`server/Modelfile`](../server/Modelfile) has them.
 
 **The first request after startup is slow / times out.**
 Cold start. Send one warm-up request after every model (re)start and keep
@@ -88,7 +98,9 @@ program that steers future versions.
 JSON 常常还没吐出来就被截断：等着你的是解析失败，不只是延迟。
 这是第一大接线错误，照抄 `server/Modelfile`。
 
-**为什么温度必须 0？** 评分是测量，采样噪声就是测量误差。官方数字全部测于 0。
+**为什么温度必须 0，还必须中性化 `repeat_penalty`？** 评分是测量，采样噪声就是测量误差。官方数字全部测于温度 0 **且无重复惩罚**。
+
+后半句坑得很深且无声：**ollama 默认 `repeat_penalty 1.1`**，而本模型的输出 `{"A": 0.0, "W": 0.0, ...}` 天然高度重复——惩罚重复 token 等于**把分数从 0 往上推**，也就是凭空造出信号。我们在自己的 300 题判别考卷上实测过：造分率 **13.5% → 25.0%**，边界符号翻转（真值 0.0 被打 ≥2.0）**6 条 → 10 条**。权重没问题，运行时有问题。请始终带上 `repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`（[`server/Modelfile`](../server/Modelfile) 已内置）。
 
 **启动后第一条请求慢/超时？** 冷启动。重启后预热一发，`keep_alive=-1`（调用
 设硬超时，工具包与参考服务器默认 8 秒）。之后
