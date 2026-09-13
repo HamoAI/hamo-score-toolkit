@@ -83,13 +83,16 @@ negative, `≥ 7` neurotic — it takes only the smoothed stress value.
 5. **Don't raise temperature — and don't leave `repeat_penalty` at its default.**
    The task is measurement; sampling noise is measurement error. ollama defaults
    to `repeat_penalty 1.1`, which penalises the repeated `0.0` tokens this model
-   emits and silently inflates scores away from zero (we measured fabrication
-   13.5% → 25.0% on our own exam). Ship `repeat_penalty 1.0`, `top_k 0`,
+   emits and silently inflates scores away from zero (on the shipped v7 q8 GGUF
+   we measured Boundary fabrication 2.9% → 8.7% on our 300-question boundary
+   exam; v6.1: 13.5% → 25.0%). Ship `repeat_penalty 1.0`, `top_k 0`,
    `top_p 1.0`.
 6. **Don't feed more context than the guards allow.** 3 turns × 200 chars is
    what the model saw in training and what your latency budget affords.
-7. **Don't quantize below q8 without re-taking the exam.** q4 and below is
-   where JSON validity and agreement start to crumble.
+7. **Don't quantize below q8 without re-taking the exam.** On v7, a Q4_K_M
+   keeps agreement close but damps withdrawal one-sidedly on crisis-adjacent
+   turns — re-take the exam and read `eval/compare_quants.py`'s directional
+   table, not just the agreement number (see eval/README.md).
 8. **Don't treat B (Boundary) as a relationship diagnosis.** It measures the
    linguistic footprint of self-differentiation in one message, nothing more.
 9. **Don't tune bucket thresholds against synthetic data.** Calibrate
@@ -116,7 +119,7 @@ M1 Pro ~0.8 秒、2 vCPU ARM ~1.5–2.9 秒，慢 CPU 的成本在 prefill——
 
 **十条禁令**：① 永不凭单句原始分做决定；② 永不拆闸门、永不用模型替代闸门；
 ③ 永不把模型当危机检测器（召回是纵深防御，不是防线）；④ 永不改提示词（细则
-已烧进权重，偏离即静默出分布）；⑤ 永不升温度，也永不放任 `repeat_penalty` 用默认值（ollama 默认 1.1 会惩罚本模型输出里重复的 `0.0`，静默把分数推高——实测造分率 13.5%→25.0%；须设 `repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`）；
-⑥ 永不超出截断护栏喂上下文；⑦ 量化低于 q8 必须重考试；⑧ 永不把 B 当关系
+已烧进权重，偏离即静默出分布）；⑤ 永不升温度，也永不放任 `repeat_penalty` 用默认值（ollama 默认 1.1 会惩罚本模型输出里重复的 `0.0`，静默把分数推高——v7 发布版 q8 GGUF 在 300 题边界判别卷上实测造分率 2.9%→8.7%，v6.1 为 13.5%→25.0%；须设 `repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`）；
+⑥ 永不超出截断护栏喂上下文；⑦ 量化低于 q8 必须重考试，并看 `eval/compare_quants.py` 的方向性衰减表而不只看一致率（v7 的 Q4_K_M 一致率接近，但在危机相邻样本上单边压低退缩分）；⑧ 永不把 B 当关系
 诊断（它只测单句里自我分化的语言足迹）；⑨ 永不用合成数据校准阈值；⑩ 面向
 消费者的部署永不省略 AI 身份披露（工具包带现成文案）。

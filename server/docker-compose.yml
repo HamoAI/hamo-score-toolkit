@@ -24,20 +24,26 @@ services:
       - -c
       - |
         set -e
-        if [ ! -f /models/hamo-score-0.6b-v61.q8.gguf ]; then
+        if [ ! -f /models/hamo-score-0.6b-v7.q8.gguf ]; then
           echo "downloading GGUF (639MB, one-time)..."
-          curl -L --fail -o /models/hamo-score-0.6b-v61.q8.gguf \
-            https://huggingface.co/HamoAI/hamo-score-0.6b/resolve/main/gguf/hamo-score-0.6b-v61.q8.gguf
+          curl -L --fail -o /models/hamo-score-0.6b-v7.q8.gguf \
+            https://huggingface.co/HamoAI/hamo-score-0.6b/resolve/main/gguf/hamo-score-0.6b-v7.q8.gguf
         fi
+        # /api/create takes blob digests, not paths: upload the GGUF as a blob first
+        # (a digest mismatch — e.g. a truncated download — fails here with HTTP 400).
+        echo "uploading GGUF blob to ollama..."
+        curl -sS --fail -T /models/hamo-score-0.6b-v7.q8.gguf -X POST \
+          http://ollama:11434/api/blobs/sha256:fb1018c8a38ad0da573544b827e42f1685e051c688f8de587cbb81ae1275e3ea
         echo "creating model in ollama..."
-        curl -s http://ollama:11434/api/create -d '{
+        curl -sS --fail http://ollama:11434/api/create -d '{
           "model": "hamo-score-0.6b",
-          "files": {"hamo-score-0.6b-v61.q8.gguf": "/models/hamo-score-0.6b-v61.q8.gguf"},
+          "files": {"hamo-score-0.6b-v7.q8.gguf": "sha256:fb1018c8a38ad0da573544b827e42f1685e051c688f8de587cbb81ae1275e3ea"},
           "template": "<|im_start|>user\n{{ .Prompt }}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
-          "parameters": {"temperature": 0, "num_predict": 80, "stop": ["<|im_end|>"], "repeat_penalty": 1.0, "top_k": 0, "top_p": 1.0}
+          "parameters": {"temperature": 0, "num_predict": 80, "stop": ["<|im_end|>"], "repeat_penalty": 1.0, "top_k": 0, "top_p": 1.0},
+          "stream": false
         }'
         echo "warmup..."
-        curl -s http://ollama:11434/api/generate -d '{"model":"hamo-score-0.6b","prompt":"给来访者最新消息打分（AWEHB，0.0-3.0）。\n最新消息: 预热","stream":false,"keep_alive":-1}' > /dev/null
+        curl -sS --fail http://ollama:11434/api/generate -d '{"model":"hamo-score-0.6b","prompt":"给来访者最新消息打分（AWEHB，0.0-3.0）。\n最新消息: 预热","stream":false,"keep_alive":-1}' > /dev/null
         echo "setup done"
 
   api:

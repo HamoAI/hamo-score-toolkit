@@ -19,9 +19,12 @@ This second half bites hard and silently. **ollama defaults to
 `repeat_penalty 1.1`**, and this model's output — `{"A": 0.0, "W": 0.0, "E": 0.0,
 "H": 0.0, "B": 0.0}` — is deliberately repetitive. Penalising repeated tokens
 pushes scores *away from 0*, i.e. it fabricates signal. We measured it on our own
-300-question discrimination exam: fabrication rate **13.5% → 25.0%**, and
-boundary sign-flips (a `0.0` scored `≥2.0`) **6 → 10**. The weights were fine;
-the runtime was not. Always ship `repeat_penalty 1.0`, `top_k 0`, `top_p 1.0` —
+300-question boundary-discrimination exam with the shipped v7 q8 GGUF: switching from 1.0
+to 1.1 takes the fabrication rate **2.9% → 8.7%** and boundary sign-flips (a
+`0.0` scored `≥2.0`) **0 → 1**. The miss rate falls (12.8% → 6.7%), but that is
+the same upward push, not an improvement. (On v6.1 the same switch was 13.5% →
+25.0% fabrication and 6 → 10 sign-flips.) The weights were fine; the runtime
+was not. Always ship `repeat_penalty 1.0`, `top_k 0`, `top_p 1.0` —
 [`server/Modelfile`](../server/Modelfile) has them.
 
 **The first request after startup is slow / times out.**
@@ -54,8 +57,13 @@ prefill on longer contexts is what blows latency budgets. More context is
 out-of-distribution *and* slower.
 
 **Do I need a GPU?**
-No. q8 GGUF on a 2-vCPU ARM server scores in 1.5–2.9 s; an M1 laptop ~0.8 s
-(bf16 via MLX). Stay at q8 — below that, JSON validity and agreement start to crumble.
+No. q8 GGUF on a 2-vCPU ARM server scores in 1.5–2.9 s; an Apple M1 Pro ~0.8 s
+(bf16 via MLX). Where scores gate behaviour, use the shipped q8. If memory is
+tight, a Q6_K quantized from the v7 weights is also validated for gating: it was
+indistinguishable from q8 on our internal 453-turn final split. We don't publish
+it, so you have to quantize it yourself. Q4_K_M is for research or human-read
+scores; lower builds are unvalidated, and the community GGUFs were made from the
+older v4 weights — see [eval/README.md](../eval/README.md).
 
 **Is it a crisis detector?**
 No, and it must never be deployed as one. Crisis handling is the deterministic
@@ -63,14 +71,15 @@ No, and it must never be deployed as one. Crisis handling is the deterministic
 mental-wellness deployments. The model's own crisis-phrase recall is
 defense-in-depth, never the defense.
 
-**Why does my exam score say 84% when the model card says 85.6%?**
-Different exams. 85.6%/96.2% (v6.1) is graded on the real 453-turn held-out
-final, which never leaves the building. The shipped synthetic exam is a
-different paper whose job is to certify *your wiring*, not the model —
+**Why does my exam score say about 83.5% when the model card says 85.1%?**
+Different exams. 85.1%/97.1% (v7 bf16, dimension-level/decision-level) is graded
+on the real 453-turn held-out final, which never leaves the building. The shipped
+synthetic exam is a different paper (v7 bf16 reference 83.5%; the shipped q8 GGUF
+at neutral sampling 83.8%) whose job is to certify *your wiring*, not the model —
 what matters is landing inside the 81–86% band.
 
 **Can I fine-tune it on my own data?**
-Yes — [docs/finetune.md](finetune.md) is the full six-generation playbook,
+Yes — [docs/finetune.md](finetune.md) is the full seven-generation playbook,
 data red lines first. Your fine-tuned weights remain under HAMO-RAIL-S (the
 guide's §8 covers what you owe).
 
@@ -100,7 +109,7 @@ JSON 常常还没吐出来就被截断：等着你的是解析失败，不只是
 
 **为什么温度必须 0，还必须中性化 `repeat_penalty`？** 评分是测量，采样噪声就是测量误差。官方数字全部测于温度 0 **且无重复惩罚**。
 
-后半句坑得很深且无声：**ollama 默认 `repeat_penalty 1.1`**，而本模型的输出 `{"A": 0.0, "W": 0.0, ...}` 天然高度重复——惩罚重复 token 等于**把分数从 0 往上推**，也就是凭空造出信号。我们在自己的 300 题判别考卷上实测过：造分率 **13.5% → 25.0%**，边界符号翻转（真值 0.0 被打 ≥2.0）**6 条 → 10 条**。权重没问题，运行时有问题。请始终带上 `repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`（[`server/Modelfile`](../server/Modelfile) 已内置）。
+后半句坑得很深且无声：**ollama 默认 `repeat_penalty 1.1`**，而本模型的输出 `{"A": 0.0, "W": 0.0, ...}` 天然高度重复——惩罚重复 token 等于**把分数从 0 往上推**，也就是凭空造出信号。我们在自己的 300 题边界判别考卷上用随包 v7 q8 GGUF 实测过：从 1.0 换成 1.1，造分率 **2.9% → 8.7%**，边界符号翻转（真值 0.0 被打 ≥2.0）**0 条 → 1 条**。漏报率随之从 12.8% 降到 6.7%，但那是同一股往上推的力，不是改进。（v6.1 上同一开关是造分率 13.5% → 25.0%、翻转 6 条 → 10 条。）权重没问题，运行时有问题。请始终带上 `repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`（[`server/Modelfile`](../server/Modelfile) 已内置）。
 
 **启动后第一条请求慢/超时？** 冷启动。重启后预热一发，`keep_alive=-1`（调用
 设硬超时，工具包与参考服务器默认 8 秒）。之后
@@ -119,18 +128,22 @@ JSON 常常还没吐出来就被截断：等着你的是解析失败，不只是
 **多喂点上下文会不会更准？** 不会。3 轮×200 字是模型训练时见过的形状，超出
 即出分布，且慢 CPU 的 prefill 会吃爆延迟预算。
 
-**需要 GPU 吗？** 不需要。2 vCPU ARM 服务器 q8 1.5–2.9 秒，M1 笔记本 ~0.8 秒
+**需要 GPU 吗？** 不需要。2 vCPU ARM 服务器 q8 1.5–2.9 秒，M1 Pro 笔记本 ~0.8 秒
 （MLX bf16）。
-量化守住 q8。
+门控行为的部署用随包 q8；内存紧张时，从 v7 权重量化的 Q6_K 也已验证可用于门控
+（在内部 453 轮终评集上与 q8 无差别；未发布，需自行量化）。Q4_K_M 只适合研究或由人来读
+分数；更低档位未验证，社区 GGUF 则是用更早的 v4 权重制作的——详见
+[eval/README.md](../eval/README.md)。
 
 **它是危机检测器吗？** 不是，也永远不许当危机检测器部署。危机归上游确定性
 闸门（许可证 §3c）；模型的危机语召回只是纵深防御。
 
-**为什么我考出 84% 而模型卡写 85.6%？** 两张不同的卷子。85.6%/96.2% 判于
-453 条真实终评卷（永不出门）；随包的是另一张合成卷，任务是认证**你的接线**——
+**为什么我考出约 83.5% 而模型卡写 85.1%？** 两张不同的卷子。85.1%/97.1%（v7 bf16，
+维度级/决策级）判于 453 条真实终评卷（永不出门）；随包的是另一张合成卷（v7 bf16
+参考值 83.5%，随包 q8 GGUF 在中性采样下 83.8%），任务是认证**你的接线**——
 落在 81–86% 合格带内即正确。
 
-**能用自己的数据微调吗？** 能——[微调指南](finetune.md)是完整六代打法，数据
+**能用自己的数据微调吗？** 能——[微调指南](finetune.md)是完整七代打法，数据
 红线在最前。微调出的权重仍受 HAMO-RAIL-S 约束（指南 §8）。
 
 **评分不服怎么办？** 可能你是对的！被替换的参照评分器自己重打同句也有 2–6%

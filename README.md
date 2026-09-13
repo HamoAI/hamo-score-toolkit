@@ -24,7 +24,7 @@ requires upstream of the model in any consumer-facing deployment.
 
 ```bash
 # 1. get the model (one-time)
-hf download HamoAI/hamo-score-0.6b gguf/hamo-score-0.6b-v61.q8.gguf --local-dir /tmp/hamo
+hf download HamoAI/hamo-score-0.6b gguf/hamo-score-0.6b-v7.q8.gguf --local-dir /tmp/hamo
 ollama create hamo-score-0.6b -f server/Modelfile
 
 # 2. install the toolkit
@@ -74,12 +74,12 @@ handwritten crisis-gate cases. Run it against your own deployment and compare
 with the official reference band in [eval/README.md](eval/README.md):
 
 ```bash
-python eval/run_exam.py    # reference: JSON 100%, dim-level 84.0%, gate 10/10
+python eval/run_exam.py    # reference (v7 bf16): JSON 100%, dim-level 83.5%, gate 10/10
 ```
 
 ## Adapting it to your own population
 
-Read [docs/finetune.md](docs/finetune.md) — the six-generation fine-tuning
+Read [docs/finetune.md](docs/finetune.md) — the seven-generation fine-tuning
 playbook, including the two generations we rejected for crisis-recall
 regressions and exactly why. Data red lines first, then the real LoRA recipe,
 checkpoint selection with a crisis-miss column, and the acceptance hard gate.
@@ -139,9 +139,9 @@ default pipeline satisfies the crisis-handling pattern by construction.
 
 **一键服务器**：`cd server && docker compose up`——自动拉 GGUF、建模型、预热，`POST localhost:8080/score` 直接返回 危机/五维分/压力值/状态桶，危机命中的请求永远不会碰到模型。
 
-**部署自检**：`python eval/run_exam.py`——195 题合成考卷（教师标注，零真实数据）+ 10 条手写危机闸门用例，对照 [eval/README.md](eval/README.md) 的官方参考带（JSON 合法率 100%、维度级 84.0%、闸门 10/10）验证你的部署接线正确。
+**部署自检**：`python eval/run_exam.py`——195 题合成考卷（教师标注，零真实数据）+ 10 条手写危机闸门用例，对照 [eval/README.md](eval/README.md) 的官方参考带（v7 bf16 参考值：JSON 合法率 100%、维度级 83.5%、闸门 10/10）验证你的部署接线正确。
 
-**想微调到你自己的人群？** 读 [docs/finetune.md](docs/finetune.md)——六代模型蒸出来的完整打法（含两代拒收与确切原因）：数据红线、真实 LoRA 配方、带危机漏检列的选点表、验收硬闸。
+**想微调到你自己的人群？** 读 [docs/finetune.md](docs/finetune.md)——七代模型蒸出来的完整打法（含两代拒收与确切原因）：数据红线、真实 LoRA 配方、带危机漏检列的选点表、验收硬闸。
 
 **更多文档**：[集成指南](docs/integration.md)（正确接线 + 十条禁令）、[FAQ](docs/faq.md)、[微调指南](docs/finetune.md)；[`examples/`](examples) 里有可跑的批量打分与会话监测演示（带 `--mock`，无模型也能看管线）。
 

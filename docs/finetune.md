@@ -7,11 +7,12 @@ downloaded [HamoAI/hamo-score-0.6b](https://huggingface.co/HamoAI/hamo-score-0.6
 and want to adapt it — to a new language, a new population, a different
 register — using their own **consented** data.
 
-It is the distilled playbook of five model generations, including two we
+It is the distilled playbook of seven model generations, including two we
 **rejected** after training completed (v5 and v6, both for crisis-recall
 regressions). The rejections taught us more than the successes, so they are in
 here as rules. Everything below was learned on one MacBook and about US$7 of
-API spend — this is not a cluster-scale process.
+API spend through v6.1, plus v7's temperature-0 re-label and boundary patch —
+this is not a cluster-scale process.
 
 One framing before anything else: hamo-score is a **measuring instrument**.
 It is not a chatbot, not a diagnostic tool, not a therapist, and **not a
@@ -57,7 +58,7 @@ be released at all.
 **R1. Informed consent for any real data.** Our own training corpus is
 synthetic except, since v6.1, 440 real conversation turns from three
 company-internal staff members (the founder and two staff counselors) with
-their explicit consent, upsampled ×3 (~8% of corpus). External client/user
+their explicit consent, upsampled ×3 (~8% of the v6.1 corpus). External client/user
 conversations **never** enter training, by construction. Adopt the same
 construction: real client data may serve as *exam* material (held-out
 evaluation, where your governance and local law permit), and enters *training*
@@ -100,7 +101,8 @@ unconsciously build it out of what your model is good at.
 **Split three ways.** Ours: 1,198 real de-identified turns → a
 teacher-qualification / calibration set (440) and a held-out final. The final
 is touched **once** per generation, for the shipping decision — never for
-checkpoint selection, never for prompt iteration. If your calibration set
+checkpoint selection (v7 is the one exception, see §6), never for prompt
+iteration. If your calibration set
 later enters training (ours did, in v6.1, under R1 consent), carve a fresh
 selection split out of held-out territory first; a set you train on can no
 longer select checkpoints.
@@ -112,8 +114,10 @@ agreement (§6) — without it you can only measure dimensions, and dimensions
 are the wrong headline number.
 
 **Qualify your teacher before it labels anything.** Whatever model you use to
-label training data (we use `deepseek-chat` with the production rubric at
-temperature 0), make it sit your real exam first. Our bar on 440 real turns:
+label training data (we use `deepseek-chat` with the production rubric; label
+at temperature 0 — our corpora through v6.1 were labelled at a non-zero
+temperature, and re-labelling the corpus at temperature 0 was the main change
+in v7), make it sit your real exam first. Our bar on 440 real turns:
 dimension-level ±0.5 agreement ~89% (88.7%), decision-level 97.5%. Look at
 per-dimension numbers, not just the mean: our teacher first scored 72% on the
 Boundary dimension — a fixable operational-definition mismatch, closed to 78%
@@ -224,8 +228,10 @@ the model actually sees them, and keep them out of every eval split.
 
 ## 5. The LoRA recipe
 
-This is the actual config that trained the released v6.1 weights (`mlx-lm`,
-one M1 Pro MacBook, 16GB). Paths adapted, numbers untouched:
+This is the actual config that trained the released v7 weights (`mlx-lm`,
+one MacBook) — identical, hyperparameter for hyperparameter, to the v6.1 run
+before it (one M1 Pro MacBook, 16GB); only the data changed. Paths adapted,
+numbers untouched:
 
 ```yaml
 # finetune.yaml
@@ -268,7 +274,8 @@ Three of these numbers are scars; treat them as load-bearing:
   the run exploded *numerically, not loudly* — loss 0.118 → 10.8 by step 600
   while the process kept running. Rule of thumb: when you double sequence
   length, halve the batch. The healthy config peaks at ~4.7GB and ends around
-  loss 0.06.
+  loss 0.06 (both measured on an earlier run of this identical config, our
+  v4 retrain; the v7 run recorded neither).
 - **`max_seq_length: 1024`, not 512.** Tempting to shorten for speed, but
   512 truncates long messages with 5-turn contexts — exactly the samples the
   style quotas fought to include.
@@ -276,10 +283,12 @@ Three of these numbers are scars; treat them as load-bearing:
 `save_every: 1200` yields six checkpoints — that is your selection pool for
 §6, so don't save less often to save disk.
 
-Rough wall-clock: a full 7,200-iteration run over a ~16k-row corpus takes on
-the order of a few hours on an M1 Pro — start it after lunch, select
-checkpoints before dinner. The valid split exists to watch for divergence
-during training, **not** to pick checkpoints (next section explains why).
+Rough wall-clock: a full 7,200-iteration run takes on the order of a few
+hours on a MacBook — v6.1 ran over a ~16k-row corpus (16,432 train rows) on
+an M1 Pro; v7 ran over ~19k rows (18,856 train) in about 2 h 16 min by its
+checkpoint timestamps. Start it after lunch, select checkpoints before dinner.
+The valid split exists to watch for divergence during training, **not** to
+pick checkpoints (next section explains why).
 
 The recipe is written for MLX because that is what we ran. The load-bearing
 parts — prompt masking, the seq/batch/memory trade, LR shape, checkpoint
@@ -328,9 +337,21 @@ The selection table has four columns, and every one earned its place:
    at a few hundred samples; re-run comparisons that matter across seeds.
 3. **Crisis-miss count** (gold W ≥ 2.5 scored below 0.5). v5's champion-by-
    decision-level checkpoint carried **18** crisis misses; selection without
-   this column is blind exactly where you can least afford it. We now refuse
-   any checkpoint above the incumbent's miss count *at selection time*, not
-   just at final acceptance.
+   this column is blind exactly where you can least afford it. Until v7 our
+   rule was to refuse any checkpoint above the incumbent's miss count *at
+   selection time*, not just at final acceptance. For v7 we pre-registered a
+   version of that filter (≤ 2 crisis misses on the selection split, then
+   highest decision-level); it picked iteration 6,000 — and then we overrode
+   it: we decided crisis coverage is guaranteed by the upstream deterministic
+   gate rather than used as a selection constraint, and shipped iteration
+   7,200, which had zero Boundary sign flips (turns where the model scored B
+   high on self-effacing text whose gold B is 0 — reading the dimension
+   backwards). That override was made after both checkpoints had been scored
+   on the final split, so for v7 the final was touched more than once. The two
+   tied there (decision 97.1% each; dimension 85.0% for 6,000 vs 85.1% for
+   7,200), and 7,200 still passed the acceptance gate below (decision 97.1% ≥
+   96.2%, crisis misses 3 ≤ 4). So the count still gates acceptance, but it no
+   longer vetoes checkpoints at selection time.
 4. **Distinct output vectors** — the collapse detector. One early generation
    scored decently while emitting only **59** distinct five-score
    combinations against 233 in real data: it had quietly become a 14-cell
@@ -339,7 +360,7 @@ The selection table has four columns, and every one earned its place:
    is not measuring.
 
 **The acceptance hard gate.** The winning checkpoint sits the final exam —
-the split touched once — and ships only if:
+the split touched once (v7 excepted, see item 3) — and ships only if:
 
 > decision-level ≥ your incumbent, **AND** crisis-miss ≤ your incumbent.
 
@@ -384,13 +405,25 @@ python llama.cpp/convert_hf_to_gguf.py fused/my-score-model \
   --outfile my-score-model.q8.gguf --outtype q8_0
 ```
 
-Stay at **q8_0**: it lands inside the reference band in our tests, and on the
-ARM CPU servers we deploy to it was not even slower than q4 (q8 dot-product
-kernels are good on ARM). Aggressive quantization (q4 and below) is where
-JSON validity and agreement start to crumble.
+Stay at **q8_0**: it lands inside the reference band in our tests (the shipped
+v7 q8_0, run with neutral sampling, scores 83.8% dimension-level on the
+self-check exam below, JSON 100%, gate 10/10), and on the ARM CPU server we
+ran shadow scoring on, a v6.1 q4 build was not faster than q8 (q8 dot-product
+kernels are good on ARM; not re-measured for v7 — on an M1 Pro with Metal, v7
+Q4_K_M ran at 0.54 s P50 vs 0.70 s for Q8_0, so the speed trade is
+hardware-specific). Below q8, measure before you trust
+it: on v7 weights, on our internal 453-turn final split, a Q6_K we quantized
+ourselves was indistinguishable from Q8_0, while Q4_K_M lost 0.8 pt at
+dimension level (0.4 pt at decision level) and pulled W down one-sidedly on
+crisis-adjacent turns (6 lower vs 1 higher than Q8_0) — bucket agreement
+barely moves while direction does. So: Q6_K from v7 held up for gating when
+memory is tight; keep Q4_K_M to research, offline or human-read scores (if it
+must gate, keep the deterministic gate upstream, as always, and consider
+compensating the withdrawal threshold); nothing below Q4_K_M is validated.
+(llama.cpp, neutral sampling; Q4_K_M added no crisis miss here, 3 vs 3.)
 
-Create the ollama model with the **empty-think template and temperature 0** —
-this is the single most common wiring mistake. Use
+Create the ollama model with the **empty-think template, temperature 0 and
+neutral sampling** — this is the single most common wiring mistake. Use
 [`server/Modelfile`](../server/Modelfile) as-is (edit the `FROM` line), or see
 the same template inlined in
 [`server/docker-compose.yml`](../server/docker-compose.yml):
@@ -408,6 +441,10 @@ TEMPLATE """<|im_start|>user
 PARAMETER temperature 0
 PARAMETER num_predict 80
 PARAMETER stop <|im_end|>
+# neutral sampling: ollama's default repeat_penalty 1.1 penalizes the score JSON's repeated tokens and pushes scores up from 0
+PARAMETER repeat_penalty 1.0
+PARAMETER top_k 0
+PARAMETER top_p 1.0
 ```
 
 ```bash
@@ -482,7 +519,7 @@ and stay inside the four use restrictions — then you are square.
 
 ---
 
-## Appendix: six generations at a glance
+## Appendix: seven generations at a glance
 
 | Generation | What changed | Outcome |
 |---|---|---|
@@ -491,9 +528,10 @@ and stay inside the four use restrictions — then you are square.
 | v4 | 8-agent data audit: prompt masking, style quotas, mid-band cells, 15k corpus | shipped — dim 84.0% (+3.1), crisis misses 11 → 5, output vectors 59 → 87 |
 | v5 | synthetic patch cells with a W-cap admission gate | **rejected** — crisis misses 2–3× worse; taught us the distress-adjacent W-cap rule |
 | v6 | +440 real turns, incumbent's labels unscreened | **rejected** — 3 crisis-artifact rows in training, misses 5 → 9; taught us R2 |
-| v6.1 (released) | same 440 real turns, teacher labels, crisis-artifact screening | shipped — dim 85.6%, decision 96.2%, crisis misses 4 |
+| v6.1 | same 440 real turns, teacher labels, crisis-artifact screening | shipped, superseded by v7 — dim 85.6%, decision 96.2%, crisis misses 4 |
+| v7 (released) | same config as v6.1; teacher re-labelled the corpus at temperature 0 + 2,713-row boundary-discrimination patch (18,856 train rows) | shipped — dim 85.1%, decision 97.1%, crisis misses 4 → 3 |
 
-Those six adjudicated generations sit on top of about ten actual training
+Those seven adjudicated generations sit on top of about eleven actual training
 runs — pilots, restarts, and a same-size rerun or two that never earned a row
 here, plus one run on a student three times larger that gained roughly a point
 and was dropped. Budget for that ratio: you will train more often than you
@@ -512,7 +550,7 @@ is not a failure statistic — it is the evidence the process works.
 
 你从 HuggingFace 下载了
 [hamo-score-0.6b](https://huggingface.co/HamoAI/hamo-score-0.6b)，想用**经
-授权的**自有数据把它适配到你的人群、语域或语言。本文是我们六代模型（含两代
+授权的**自有数据把它适配到你的人群、语域或语言。本文是我们七代模型（含两代
 拒收）蒸馏出来的操作手册。先立框架：它是**测量仪器**——不是聊天机器人、不是
 诊断工具、不是治疗师，也**不是危机检测器**。危机处理由模型上游的确定性闸门
 （`CrisisGate`）负责——这是许可证 HAMO-RAIL-S §3(c) 对面向消费者的心理健康
@@ -533,7 +571,7 @@ is not a failure statistic — it is the evidence the process works.
 
 - **R1 知情同意**：我们的训练语料全部为合成数据，唯一例外是 v6.1 起加入的
   440 条真实对话轮次——来自三位公司内部员工（创始人与两位咨询师）、经本人明示
-  授权、×3 上采样约占语料 8%；**外部来访者对话从不入训，构造上保证**。照此
+  授权、×3 上采样约占 v6.1 语料 8%；**外部来访者对话从不入训，构造上保证**。照此
   执行：真实来访数据可做考卷（当地法规与治理允许时），入训必须有书面、可撤回
   的本人授权。「已脱敏」不等于授权。
 - **R2 危机工件筛查**：v6 拒收的教训。危机内容在生产里被上游短路，会留下
@@ -549,10 +587,11 @@ is not a failure statistic — it is the evidence the process works.
 
 项目第一件产物是**真实数据终评考卷**（永不入训），第二件是**过了资格考的
 教师**。顺序颠倒，你会不自觉地照着模型的长处出题。三切分：教师资格/校准集、
-选点集、终局集（每代只碰一次）。校准集若日后经授权入训（我们 v6.1 就这么做
+选点集、终局集（每代只碰一次；v7 为例外，见§六）。校准集若日后经授权入训（我们 v6.1 就这么做
 了），须先从留出区另切选点集。每行连同消息、上下文、金标一起，**记录当时的
 压力值等决策上下文**——否则算不了决策级。教师资格考：给训练数据打标的模型
-（我们用 deepseek-chat + 生产量表 + temperature 0）先考你的真题，我们的线：
+（我们用 deepseek-chat + 生产量表；打标用 temperature 0——v6.1 及以前的语料是在
+非零温度下打标的，v7 的主要变化就是以 temperature 0 重标语料）先考你的真题，我们的线：
 维度级 ±0.5 约 89%、决策级 97.5%；要逐维看——我们教师 B 维初考 72%，靠量表
 校准注记修到 78%，平均数会把坏维度藏起来。再量一下现任评分器的自洽：同批
 消息打两遍只有 94–98% 一致，这就是天花板。若另建 LLM judge 用于任何触人
@@ -578,12 +617,13 @@ mlx-lm 聊天格式 JSONL，user 内容**必须**用 `hamo_score.build_prompt` �
 倍，整代拒收。风格配额要对齐真实分布：我们的真实流量 35.5% 是 15 字以内短
 消息、62% 带多轮上下文，合成器天然写不出这些——按真实占比强制配额，再加
 生成器口头禅黑名单、中间档（0.5/1.0/1.5）标签强制出现、纯原型样本 <20% 封顶。
-真实授权数据少量即有效：440 条 ×3 上采样让维度级 +1.6pt（84.0→85.6），A 维
+真实授权数据少量即有效：v6.1 的 440 条 ×3 上采样让维度级 +1.6pt（84.0→85.6），A 维
 81→85 创历代新高。
 
 ### 五、LoRA 配方（MLX，一台 MacBook）
 
-发布版 v6.1 的真实配置（路径改成你的，数字别动）：base
+发布版 v7 的真实配置（与 v6.1 逐项超参完全相同，只换了数据；路径改成你的，
+数字别动）：base
 `mlx-community/Qwen3-0.6B-bf16`，LoRA rank 8 / scale 20 / 16 层，
 `batch_size: 4`，`iters: 7200`，LR `7e-5` cosine 退火至 `7e-6`（warmup 100），
 **`mask_prompt: true`**，`grad_checkpoint: true`，`max_seq_length: 1024`，
@@ -591,8 +631,10 @@ mlx-lm 聊天格式 JSONL，user 内容**必须**用 `hamo_score.build_prompt` �
 是伤疤：① `mask_prompt` 不开，72% 梯度耗在给来访者消息做语言建模上（我们
 瞎跑了六轮才发现），单开此项决策级 +1.4pp；② 16GB 机器上 seq 1024 配
 batch 8 会顶到 16.6GB 并**无声数值爆炸**（loss 0.118→10.8），序列翻倍、
-batch 减半，健康跑法峰值 4.7GB；③ seq 别降到 512——会截断长上下文样本，
-正是配额辛苦补进来的那些。全程约数小时量级，午后开跑、晚饭前选点。
+batch 减半，健康跑法峰值 4.7GB（同一配置早先 v4 重训实测，v7 未记录）；③ seq 别降到
+512——会截断长上下文样本，正是配额辛苦补进来的那些。全程约数小时量级（v6.1
+约 1.6 万行语料、16,432 条训练行，M1 Pro；v7 约 1.9 万行、18,856 条训练行，
+按 checkpoint 时间戳约 2 小时 16 分），午后开跑、晚饭前选点。
 
 ### 六、选点与验收
 
@@ -602,7 +644,15 @@ batch 减半，健康跑法峰值 4.7GB；③ seq 别降到 512——会截断�
 ±0.5（诊断用）、决策级（选点用，<2pt 视为噪声）、**危机漏检数**（金标 W≥2.5
 而预测 <0.5——v5 的选点冠军漏检 18 条，没有这一列的选点在最不能瞎的地方是
 瞎的）、**输出向量种类数**（塌缩探测器：某早期学生只会输出 59 种五维组合，
-真实数据有 233 种——它退化成了格子分类器）。终局硬闸（预先写死）：**决策级
+真实数据有 233 种——它退化成了格子分类器）。v7 之前，我们在选点时就拒收漏检
+高于现任的 checkpoint，不只在终局验收时拒。v7 预注册了这条过滤的一个版本
+（选点集漏检 ≤2，再取决策级最高），它选中第 6,000 步——随后我们推翻了它：
+决定危机覆盖由上游确定性闸门保证、不再作为选点约束，改发边界符号翻转（把
+自我消融、金标 B=0 的发言打成高 B，方向判反）为 0 的第 7,200 步。此决定是在
+两者都已考过终局集之后做出的，v7 的终局集因此不止碰了一次。两者在终局集上
+打平（决策级均 97.1%；维度级第 6,000 步 85.0%、第 7,200 步 85.1%），第 7,200
+步仍过终局硬闸（决策级 97.1% ≥ 96.2%，漏检 3 ≤ 4）。所以
+漏检数仍卡验收，但不再在选点时一票否决。终局硬闸（预先写死）：**决策级
 ≥ 现任 且 危机漏检 ≤ 现任**，任一不过整代拒收、现任留任——我们照此拒了
 v5 和 v6 两代。接真实流量先跑**影子模式**，切换标准预注册（我们的：影子
 ≥1 周、回退率 <2%、决策级 ≥96%、平滑压力轨迹偏差 ≤0.05、危机零漏检）。
@@ -610,9 +660,19 @@ v5 和 v6 两代。接真实流量先跑**影子模式**，切换标准预注册
 ### 七、上线
 
 `python -m mlx_lm fuse` 融合 → llama.cpp `convert_hf_to_gguf.py --outtype q8_0`
-转 GGUF（就用 q8：参考带内，且 ARM CPU 上不比 q4 慢；q4 以下开始碎）→
-`ollama create`，模板必须带**空 `<think>` 块 + temperature 0**（照抄
-`server/Modelfile`，这是最常见的接线错误）→ 生产设 `keep_alive=-1`、重启后
+转 GGUF（就用 q8：参考带内——v7 发布版 q8_0、中性采样下自检维度级 83.8%、
+JSON 100%、闸门 10/10——且在我们跑影子评分的 ARM CPU 服务器上，v6.1 的 q4 不比
+q8 快（v7 未复测；M1 Pro Metal 上 v7 Q4_K_M P50 0.54 s、Q8_0 0.70 s，速度取舍
+因硬件而异）。更低位宽先实测再信：v7 权重、内部 453 轮终局集上，
+我们自行量化的 Q6_K 与 Q8_0 无差别；Q4_K_M 维度级 −0.8pt、决策级 −0.4pt，
+危机邻近轮次上 W 单向偏低（比 Q8_0 低 6 条、高 1 条）——分桶一致率几乎不动，
+方向却动了。所以：Q6_K（v7 量化）可在内存紧张时用于门控；Q4_K_M 仅限研究/
+离线/人读分数（若必须门控，照常保留上游确定性闸门并考虑补偿 W 阈值）；Q4_K_M
+以下未验证（llama.cpp、中性采样；Q4_K_M 未新增危机漏检，3 vs 3））→ `ollama create`，模板必须带**空 `<think>`
+块 + temperature 0 + 中性采样**（`repeat_penalty 1.0`、`top_k 0`、
+`top_p 1.0`——ollama 默认 repeat_penalty 1.1 会惩罚分数 JSON 里的重复 token，
+把分数从 0 往上推；照抄 `server/Modelfile`，这是最常见的接线错误）→ 生产设
+`keep_alive=-1`、重启后
 预热一发。最后交卷：`python eval/run_exam.py --model 你的模型`，对照
 `eval/README.md` 参考带（JSON ≥99%、维度级 81–86%、**闸门 10/10 硬性**）。
 若你的微调实质改变了评分分布，随包考卷的标签已不公允——用你的合格教师按同样
@@ -637,12 +697,15 @@ v5 和 v6 两代。接真实流量先跑**影子模式**，切换标准预注册
 源仓库指引发布、闸门挡在模型前面、披露 AI 身份、守住四条使用限制，你就是
 合规的。
 
-### 附：六代小史
+### 附：七代小史
 
 v2 首蒸（维度 81）→ v3.x 配平（决策 96.8）→ v4 审计驱动重修数据（维度
 84.0，漏检 11→5）→ **v5 拒收**（W 上限准入闸门，漏检 2–3×）→ **v6 拒收**
-（3 条危机工件入训，漏检 5→9）→ **v6.1 发布**（440 条授权真实数据 + 工件
-筛查，维度 85.6、漏检 4）。这六代定谳之下是约十次实际训练——试跑、重启、
+（3 条危机工件入训，漏检 5→9）→ v6.1 发布（440 条授权真实数据 + 工件
+筛查，维度 85.6、决策 96.2、漏检 4；已被 v7 取代）→ **v7 发布**（配置同
+v6.1；教师以 temperature 0 重标全量语料 + 2,713 行边界区分补丁，共 18,856
+条训练行；维度 85.1、决策 97.1、漏检 4→3）。这七代定谳之下是约十一次实际
+训练——试跑、重启、
 没能挣到一行表格的重训，外加一次三倍大学生的实验（只涨约一分，弃）。按这个
 比例做预算：训练的次数一定多于发布的次数。值得复制的不是任何一个数字，而是流程本身：每代
 考同一张考卷，考卷永不入训，验收标准在出分前写死。两次拒收不是事故率——

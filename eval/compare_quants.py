@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 """Compare quantization builds — including the damage a headline number hides.
 
-Why this exists: when we measured the community GGUF builds of hamo-score-0.6b
-against our internal final exam, dimension-level agreement moved ~1 point and
-state-bucket agreement moved 0.4–0.6 points between q8_0, q6_k and q4_k_m — near
-enough to call them equivalent. They are not. Underneath those numbers, the
-lower-bit builds *attenuate*: every dimension drifts toward zero, and the drift
-concentrates exactly where a scorer must not go quiet — on high-withdrawal,
-crisis-adjacent turns. State buckets are coarse enough to absorb a damped signal,
-so bucket agreement alone will never surface it.
+Why this exists: when we measured v7 builds of hamo-score-0.6b against our
+internal 453-turn final exam (llama.cpp, neutral sampling), state-bucket
+agreement moved only 0.4 points from q8_0 to q4_k_m (97.1% -> 96.7%) — near
+enough to call them equivalent. Underneath, q4_k_m still *attenuates*
+one-sidedly exactly where a scorer must not go quiet: on the 37 crisis-adjacent
+turns (gold W >= 2.5) of that split it scored W lower than q8_0 on 6 and higher
+on 1 (mean W 2.58 -> 2.50), though it added no crisis miss there. (q6_k was indistinguishable
+from q8_0.) State buckets are coarse enough to absorb a damped signal, so bucket
+agreement alone will never surface it.
+
+An earlier version of this note cited a larger gap ("every dimension drifts
+toward zero"); that compared our v6.1 q8_0 against community GGUF builds made
+from older (v4) weights, so it was mostly a version gap, not a quantization gap.
+See eval/README.md for the v7 table.
 
 This script runs the toolkit's synthetic exam against two or more deployments
 and reports three things per pair:
@@ -19,10 +25,14 @@ and reports three things per pair:
      LOWER than build A vs higher, and the same split restricted to the exam's
      high-withdrawal turns. A one-sided split there is the finding.
 
-Usage (each build is an ollama tag you created from a different GGUF):
+Usage (each build is an ollama tag you created from a different GGUF). The repo
+ships only server/Modelfile — copy it once per extra build and change only its
+FROM line. No v7 q6_k/q4_k_m GGUF is published; quantize the v7 weights yourself
+(llama.cpp: convert_hf_to_gguf.py to f16, then llama-quantize; see eval/README.md).
 
-    ollama create hamo-q8  -f server/Modelfile          # edit FROM: ...q8_0.gguf
-    ollama create hamo-q4  -f server/Modelfile.q4       #            ...q4_k_m.gguf
+    cp server/Modelfile Modelfile.q4                    # then edit FROM: ...q4_k_m.gguf
+    ollama create hamo-q8  -f server/Modelfile          # FROM: the shipped q8_0 GGUF
+    ollama create hamo-q4  -f Modelfile.q4
     python eval/compare_quants.py --models hamo-q8 hamo-q4
 
 The exam is synthetic and teacher-labeled — no real client data — so anyone can
