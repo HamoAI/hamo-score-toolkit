@@ -45,6 +45,44 @@ def test_crisis_gate_short_circuits():
     assert r.crisis.triggered and r.scores is None and not r.ok
 
 
+def test_ollama_client_pins_neutral_sampling():
+    """Every request must carry neutral sampling, whatever the server's Modelfile says.
+
+    Regression guard: ollama's default repeat_penalty 1.1 roughly doubled the
+    fabrication rate. Intercepts the real HTTP payload OllamaClient sends.
+    """
+    import json
+    import urllib.request
+    from hamo_score import OllamaClient
+
+    sent = {}
+
+    class FakeResp:
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+        def read(self):
+            return json.dumps({"response": '{"A":0,"W":0,"E":0,"H":0,"B":0}'}).encode()
+
+    def fake_urlopen(req, timeout=None):
+        sent.update(json.loads(req.data))
+        return FakeResp()
+
+    orig = urllib.request.urlopen
+    urllib.request.urlopen = fake_urlopen
+    try:
+        OllamaClient().generate("x")
+    finally:
+        urllib.request.urlopen = orig
+
+    opts = sent["options"]
+    assert opts["temperature"] == 0
+    assert opts["repeat_penalty"] == 1.0, "repeat penalty inflates scores away from 0"
+    assert opts["top_k"] == 0 and opts["top_p"] == 1.0
+    assert sent["keep_alive"] == -1
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_"):
