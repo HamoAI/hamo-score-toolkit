@@ -1,5 +1,8 @@
 # One-command reference deployment:  docker compose up
 # Services: ollama (model runtime) + setup (one-shot: fetch GGUF from HF, create model) + api (FastAPI /score)
+# Serves hamo-score-0.6b v9. To stay on v7 instead, replace every hamo-score-0.6b-v9.q8.gguf below with
+# hamo-score-0.6b-v7.q8.gguf and both sha256 digests with
+# fb1018c8a38ad0da573544b827e42f1685e051c688f8de587cbb81ae1275e3ea (v9 changed what A and B mean).
 services:
   ollama:
     image: ollama/ollama:latest
@@ -24,20 +27,20 @@ services:
       - -c
       - |
         set -e
-        if [ ! -f /models/hamo-score-0.6b-v7.q8.gguf ]; then
+        if [ ! -f /models/hamo-score-0.6b-v9.q8.gguf ]; then
           echo "downloading GGUF (639MB, one-time)..."
-          curl -L --fail -o /models/hamo-score-0.6b-v7.q8.gguf \
-            https://huggingface.co/HamoAI/hamo-score-0.6b/resolve/main/gguf/hamo-score-0.6b-v7.q8.gguf
+          curl -L --fail -o /models/hamo-score-0.6b-v9.q8.gguf \
+            https://huggingface.co/HamoAI/hamo-score-0.6b/resolve/main/gguf/hamo-score-0.6b-v9.q8.gguf
         fi
         # /api/create takes blob digests, not paths: upload the GGUF as a blob first
         # (a digest mismatch — e.g. a truncated download — fails here with HTTP 400).
         echo "uploading GGUF blob to ollama..."
-        curl -sS --fail -T /models/hamo-score-0.6b-v7.q8.gguf -X POST \
-          http://ollama:11434/api/blobs/sha256:fb1018c8a38ad0da573544b827e42f1685e051c688f8de587cbb81ae1275e3ea
+        curl -sS --fail -T /models/hamo-score-0.6b-v9.q8.gguf -X POST \
+          http://ollama:11434/api/blobs/sha256:fa189895962c33390bfbc8e86c6fc77e2b5113cbedf6f5105c38a5bc4eabd05f
         echo "creating model in ollama..."
         curl -sS --fail http://ollama:11434/api/create -d '{
           "model": "hamo-score-0.6b",
-          "files": {"hamo-score-0.6b-v7.q8.gguf": "sha256:fb1018c8a38ad0da573544b827e42f1685e051c688f8de587cbb81ae1275e3ea"},
+          "files": {"hamo-score-0.6b-v9.q8.gguf": "sha256:fa189895962c33390bfbc8e86c6fc77e2b5113cbedf6f5105c38a5bc4eabd05f"},
           "template": "<|im_start|>user\n{{ .Prompt }}<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
           "parameters": {"temperature": 0, "num_predict": 80, "stop": ["<|im_end|>"], "repeat_penalty": 1.0, "top_k": 0, "top_p": 1.0},
           "stream": false

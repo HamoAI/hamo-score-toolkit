@@ -7,9 +7,18 @@ three energy states that gate how deep a conversation may go. This module is
 that pattern, released as a reference — we recommend the same shape in any
 deployment.
 
-Formula (published in the model card):
+Formula (the model card publishes only the 0.8/0.2 blend and that A and B
+carry negative weights; the per-dimension weights are this module's
+reference values):
     session delta = 0.9·W + 1.2·E + 1.6·H − 1.0·A − 1.1·B   (quadrant-modified)
     new_stress    = 0.8 · history + 0.2 · clamp(history + delta, 0, 10)
+
+v9 caveat: these weights and the 4.0 / 7.0 cut-offs in energy_state() were set
+on pre-v9 scores. v9 scores A and B lower (B is 0 on most turns), and both
+carry negative weights, so the same conversation computes HIGHER stress under
+v9. Re-tune them on your own v9 scores before letting buckets gate anything.
+v9 注意：上述权重与 energy_state() 的 4.0 / 7.0 阈值按 v9 之前的分数定；v9 的 A、B
+打得更低，同一段对话算出的压力会更高——让分桶把关任何事之前，请用你自己的 v9 分数重调。
 """
 from __future__ import annotations
 
@@ -53,7 +62,11 @@ def update_stress(
 
 
 def energy_state(stress_level: float) -> str:
-    """Map stress (0–10) to the three-band energy state."""
+    """Map stress (0–10) to the three-band energy state.
+
+    The 4.0 / 7.0 cut-offs were set on pre-v9 scores; v9 computes higher
+    stress for the same conversation, so re-tune them before they gate anything.
+    """
     if stress_level < 4.0:
         return "positive"
     if stress_level < 7.0:

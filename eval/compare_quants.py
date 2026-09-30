@@ -14,7 +14,7 @@ agreement alone will never surface it.
 An earlier version of this note cited a larger gap ("every dimension drifts
 toward zero"); that compared our v6.1 q8_0 against community GGUF builds made
 from older (v4) weights, so it was mostly a version gap, not a quantization gap.
-See eval/README.md for the v7 table.
+See eval/README.md for the v7 table (quantization has not yet been re-measured on v9).
 
 This script runs the toolkit's synthetic exam against two or more deployments
 and reports three things per pair:
@@ -27,8 +27,10 @@ and reports three things per pair:
 
 Usage (each build is an ollama tag you created from a different GGUF). The repo
 ships only server/Modelfile — copy it once per extra build and change only its
-FROM line. No v7 q6_k/q4_k_m GGUF is published; quantize the v7 weights yourself
+FROM line. We publish no q6_k/q4_k_m GGUF of v7 or v9; quantize the weights yourself
 (llama.cpp: convert_hf_to_gguf.py to f16, then llama-quantize; see eval/README.md).
+Per-build agreement is graded against the exam's v9 labels by default; pass
+--labels pre_v9 when comparing v7 builds.
 
     cp server/Modelfile Modelfile.q4                    # then edit FROM: ...q4_k_m.gguf
     ollama create hamo-q8  -f server/Modelfile          # FROM: the shipped q8_0 GGUF
@@ -140,12 +142,14 @@ def main() -> None:
     ap.add_argument("--base-url", default="http://127.0.0.1:11434")
     ap.add_argument("--timeout", type=float, default=30.0)
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--labels", choices=["v9", "pre_v9"], default="v9",
+                    help="label set for per-build agreement: v9 (default) or pre_v9 (for v7 builds)")
     args = ap.parse_args()
 
     exam = [json.loads(l) for l in open(os.path.join(HERE, "synthetic_exam.jsonl"))]
     if args.limit:
         exam = exam[: args.limit]
-    gold = {q["id"]: q["labels"] for q in exam}
+    gold = {q["id"]: q["labels" if args.labels == "v9" else "labels_pre_v9"] for q in exam}
     print(f"Exam: {len(exam)} synthetic questions | builds: {', '.join(args.models)}")
 
     results = []
