@@ -7,8 +7,8 @@ three energy states that gate how deep a conversation may go. This module is
 that pattern, released as a reference — we recommend the same shape in any
 deployment.
 
-Formula (the model card prints the same formula and cites this module as the
-reference implementation):
+Formula (the model's technical record, linked from the model card, prints the
+same formula and cites this module as the reference implementation):
     session delta = 0.9·W + 1.2·E + 1.6·H − 1.0·A − 1.1·B   (quadrant-modified)
     new_stress    = 0.8 · history + 0.2 · clamp(history + delta, 0, 10)
 

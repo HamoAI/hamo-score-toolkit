@@ -204,8 +204,9 @@ Bold cells are the ones where weights and labels match.
 危机处理的替代指标设的；创始人看到结果后裁定，危机处理不在这个模型里判定，由模型外围的确定性代码（Hamo
 称之为「脊柱」）负责。**这是在结果已知之后，对一道预注册闸门的豁免**（受检文件
 没有更换），也是连续第二个未通过预注册闸门、经创始人裁决发布的版本（v9 的五道闸门没过两道）。检查表与裁决（原话节录）
-见[模型卡](https://huggingface.co/HamoAI/hamo-score-0.6b)的 Evaluation 一节：模型卡报告 18 项中的
-16 项，这 16 项都按签字时的通过线通过；依这项裁决，模型卡不报告 G5a、G5b 两项（G5b 过了）。
+见模型的[技术档案](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)（模型卡里有链接）的
+Evaluation 一节：技术档案报告 18 项中的
+16 项，这 16 项都按签字时的通过线通过；依这项裁决，模型卡和技术档案都不报告 G5a、G5b 两项（G5b 过了）。
 
 - **已知的一条 B 符号翻转**：「行，我全听你的，你说哪天去就哪天去。」（无上下文）这句自我消融，v10 打
   B 2.5，v7 与 v9 打 0（随包 q8，llama.cpp + Metal）。翻转数在预注册上限内，但这就是此前模型卡用来
@@ -231,9 +232,10 @@ outside this model after seeing the result: crisis handling is done by determini
 around the model (Hamo calls it "the spine"). **This is a waiver of one pre-registered gate made
 after the result was known** (the judged file was not swapped), and the second release in a row
 that ships by founder decision after failing a pre-registered gate (v9 failed 2 of its 5).
-The table of checks and the ruling (quoted in part) are in the Evaluation section of the
-[model card](https://huggingface.co/HamoAI/hamo-score-0.6b): the card reports sixteen of the 18
-checks, all passed at the signed lines, and following the ruling it does not report G5a and G5b
+The table of checks and the ruling (quoted in part) are in the Evaluation section of the model's
+[technical record](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)
+(linked from the model card): the technical record reports sixteen of the 18
+checks, all passed at the signed lines, and following the ruling neither it nor the model card reports G5a and G5b
 (G5b was met).
 
 - **A known B sign flip**: the self-erasure sentence 「行，我全听你的，你说哪天去就哪天去。」 ("Fine,
@@ -311,7 +313,7 @@ Q6_K / Q4_K_M 的数字全部来自 v7 权重；v9 也只量过 Q8_0。
 
 **同一组权重，两个文件。** `model.safetensors`（bf16）与随包 GGUF 是同一组平均权重，GGUF 由
 `convert_hf_to_gguf.py --outtype q8_0` 转出（llama.cpp `748d4225`）。本考卷上两者同为 87.3%，但逐题不能
-互换：本卷 195 题里五个分数完全相同的有 176 题（90.3%），模型卡列出的另外四份考卷上是 93.7–96.2%。
+互换：本卷 195 题里五个分数完全相同的有 176 题（90.3%），技术档案列出的另外四份考卷上是 93.7–96.2%。
 部署 safetensors 的，参考 bf16 一列（经 MLX 测得；本卷没有经 transformers 跑过）。
 
 **自己重转，哈希对不上是正常的。** 在我们的构建目录里重转，得到的文件与随包 GGUF 逐字节相同；从模型仓库
@@ -332,7 +334,7 @@ weights; on v9, too, Q8_0 is the one quantization we measured.
 averaged weights; the GGUF is `convert_hf_to_gguf.py --outtype q8_0` of them (llama.cpp
 `748d4225`). On this exam both read 87.3%, but item by item they are not interchangeable: they
 give the identical five-score read-out on 176 of this exam's 195 questions (90.3%) and on
-93.7–96.2% of items on the four other exams listed on the model card. If you serve the
+93.7–96.2% of items on the four other exams listed in the technical record. If you serve the
 safetensors, the bf16 column is the nearest reference: it was measured through MLX, and this
 exam was not run through transformers.
 

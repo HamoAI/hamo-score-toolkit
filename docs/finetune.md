@@ -20,9 +20,9 @@ handling, which the founder ruled outside this model after seeing the result;
 under the registration as signed the verdict was "rejected", and v10 is
 released by the founder's decision, a waiver of one pre-registered gate made
 after the result was known.** The file that was judged is the file that
-ships. The model card reports sixteen of the 18 checks (all sixteen passed)
+ships. The model's technical record (linked from the model card) reports sixteen of the 18 checks (all sixteen passed)
 and quotes the ruling in part
-([Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)); §6
+([Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)); §6
 and §8 say what failed each time and what we took from it. The rejections
 taught us more than the successes, so they are in here as rules. Everything
 below was learned on one MacBook plus API labelling (about US$6.5 of API
@@ -236,7 +236,7 @@ side; the rule can lower A, zero B and raise W and do nothing else. Qualify a
 detector like a teacher, against a bar written before the run. Ours failed one of four lines on its
 first run; the fault was in the answer key (two rows corrected, one dropped),
 and the unchanged detector then met the bar. That is an answer key changed
-after seeing a result, and we disclose it as one (detail on the model card).
+after seeing a result, and we disclose it as one (detail in the technical record).
 
 **Measure your incumbent's self-consistency.** In two spot checks of 12
 messages each (August 2026) the reference scorer reproduced its own dimension
@@ -591,13 +591,13 @@ as a stand-in for crisis handling (this guide does not report it or its
 companion G5b; see the result below). The checks ran once, on one
 candidate (q8 GGUF, llama.cpp with Metal, temperature 0,
 `repeat_penalty 1.0`, `top_k 0`, `top_p 1.0`; each item with its full stored
-context, not `build_prompt`'s trimming). The model card has sixteen of the
+context, not `build_prompt`'s trimming). The technical record has sixteen of the
 18 checks with pass lines and results, and the list of what was decided
 after seeing results
-([Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)).
+([Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)).
 
 **The result.** The signed pre-registration listed 18 required checks.
-Sixteen are reported on the model card, and all sixteen passed at the signed
+Sixteen are reported in the technical record, and all sixteen passed at the signed
 lines. The other two, G5a and G5b, were defined on real-exam turns as a
 stand-in for crisis handling: G5b was met and G5a was not. So v10 met 17 of
 the 18 registered checks, and under the registration as signed the verdict
@@ -605,12 +605,12 @@ was "rejected". After seeing the result the founder ruled that crisis
 handling is not judged by this model or by its W score — it is done in the
 spine, the deterministic code around the model — and that v10 passes: a
 waiver of one pre-registered gate made after the result was known. Following
-that ruling, neither this guide nor the model card reports G5a and G5b, and
+that ruling, neither this guide, nor the model card, nor its technical record reports G5a and G5b, and
 the next registration will not gate on G5a. The judged file was not swapped,
 and a second seed's average that met all 18 checks stayed report-only and
 was not used. This is the second
 release in a row to ship by the founder's decision after failing a
-pre-registered gate (v9 failed 2 of 5). The model card quotes the ruling in
+pre-registered gate (v9 failed 2 of 5). The technical record quotes the ruling in
 part.
 
 **A known B sign flip.** v10 scores 「行，我全听你的，你说哪天去就哪天去。」
@@ -1124,8 +1124,8 @@ guidance was wrong, publish it the same way.
 **签字版预注册的 18 项检查过了 17 项；没过的那一项 G5a 当初是作为危机处理的替代
 指标设的，创始人看到结果后裁定危机处理不在本模型里判定；按签字的预注册，判定是
 「拒收」，v10 由创始人决定发布——这是看到结果之后对一道预注册闸门的豁免**。受检的
-文件就是发布的文件。模型卡报告 18 项中的 16 项（16 项全过），并节录了裁定原话
-（[Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)）。全部经验
+文件就是发布的文件。模型的技术档案（模型卡里有链接）报告 18 项中的 16 项（16 项全过），并节录了裁定原话
+（[Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)）。全部经验
 来自一台 MacBook 加 API 打标，不是集群规模的流程。除另有说明外，v2–v9L 的成绩
 出自 bf16 adapter 经 MLX、温度 0（各代当时受判的口径）；标 q8 的是 GGUF 经
 llama.cpp + Metal。先立框架：它是**测量仪器**——
@@ -1226,7 +1226,7 @@ temperature 0 打出的标签，v10 新补丁的行按同一口径新打。
 条，改动了 179 条训练行的标签。检测器偏宽；这条规则只会压低 A、清零 B、抬高 W。
 检测器也要先过资格考、合格线在出分前写定：我们的第一次考四条线有一条没过，复核
 发现错在答案（更正 2 行、剔除 1 行），检测器未改动，随后达标。**这是看过结果之后
-改答案**，我们照此披露（细节见模型卡）。
+改答案**，我们照此披露（细节见技术档案）。
 
 再量一下现任评分器的自洽：2026 年 8 月的两次抽查（各 12 条消息）里，参照评分器
 对自己的维度判断在 ±0.5 内复现的比例是 95% 和 98%——只是粗略的实际上限。若另建
@@ -1343,18 +1343,18 @@ v8.1）彩排过：平均若比三个原料里最差的那个还差，规则就�
 「结果」）。各项检查只跑一次、只判
 一个候选（q8 GGUF，llama.cpp + Metal，温度 0，`repeat_penalty 1.0`、`top_k 0`、
 `top_p 1.0`；各题用存档的完整上下文，不经 `build_prompt` 截短）。18 项检查中 16 项
-的通过线与结果、以及哪些事是看过结果之后才定的，见模型卡
-[Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)。
+的通过线与结果、以及哪些事是看过结果之后才定的，见技术档案
+[Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)。
 
-**结果。** 签字的预注册列了 18 项必过的检查。模型卡报告其中 16 项，这 16 项都按
+**结果。** 签字的预注册列了 18 项必过的检查。技术档案报告其中 16 项，这 16 项都按
 签字时的通过线通过。另外两项 G5a、G5b 定义在真实终评的轮次上，当初是作为危机
 处理的替代指标设的：G5b 达到了，G5a 没有。所以 18 项检查 v10 过了 17 项；按签字的
 预注册，判定是「拒收」。看到结果之后，创始人裁定：危机处理不由这个模型判定，也
 不由它的 W 分数判定，而是在脊柱（模型外围的确定性代码）里做；v10 通过——这是
-看到结果之后对一道预注册闸门的豁免。依这项裁决，本指南与模型卡都不报告 G5a、
+看到结果之后对一道预注册闸门的豁免。依这项裁决，本指南、模型卡及其技术档案都不报告 G5a、
 G5b，下一份注册也不再拿 G5a 设闸。受检的文件没有更换；第二个种子的平均 18 项
 全过，但它只作报告，没有采用。这是连续第二次在没过预注册闸门的情况下由创始人
-决定发布（v9 是五道没过两道）。裁定原话的节录见模型卡。
+决定发布（v9 是五道没过两道）。裁定原话的节录见技术档案。
 
 **已知的一条 B 符号翻转。** v10 把「行，我全听你的，你说哪天去就哪天去。」打成
 B 2.5，v7 与 v9 打 0（q8，llama.cpp + Metal，无上下文）。旧 B 卷里有它的加长版本

@@ -128,8 +128,9 @@ the registration as signed the verdict was **rejected**; v10 is released by
 the founder's decision. This is a waiver of one pre-registered gate made after
 the result was known, and the second release in a row to ship by founder
 decision after failing a pre-registered gate (v9 failed 2 of 5). Full statement
-and the table of reported checks:
-[model card, Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation).
+and the table of reported checks: the model's
+[technical record, Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)
+(linked from the model card).
 
 *The bundled gate is a floor to build on, not a complete screen.* `CrisisGate`
 is a keyword list, not a model. It fires on 107 of the 189 ideation-plus-help
@@ -192,8 +193,8 @@ message in at 0.2) or on a pattern across turns. If a rule keys on
 boundary-setting, test it on self-erasing phrasings from your own population
 first.
 
-**Why does my exam score say about 87% when the model card says 82.4%?**
-Different exams, different labels. The card's 82.4% (v10, five dimensions
+**Why does my exam score say about 87% when the technical record says 82.4%?**
+Different exams, different labels. The technical record's 82.4% (v10, five dimensions
 averaged; same figure for q8 and bf16) is on the real final exam, whose
 reference labels follow the old A rubric: v10's A there (327/453, 72.2% within
 ±0.5) measures how far rubric v8 moved A, not accuracy.
@@ -240,7 +241,7 @@ calm, clear self-description earns B as well as a stated need or limit. v10
 also applies the explicit-ideation rule; its known B sign flip is in the
 self-erasure answer above. Rubric summaries:
 [integration guide](integration.md#upgrading-to-v10) and
-[model card](https://huggingface.co/HamoAI/hamo-score-0.6b). If a *pattern* of
+[technical record](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md). If a *pattern* of
 disagreement persists, file the **score disagreement** issue template, naming
 the model version or file. We collect these reports as input for human review
 of the rubric and of future versions.
@@ -277,7 +278,7 @@ of the rubric and of future versions.
 
 *明确自杀意念规则不改变这一点。* v10 的训练标签加了一条明确自杀意念规则（出现明确的自杀意念时，A 封顶 1.0、B 为 0、W 至少 2.5）。这是一条关于分数和压力公式的规则，不是危机处理：A 封顶和 B 归零是 v10 新增的，为的是不让意念旁边的求助压低算出的压力。新旧两份 W 安全卷共 189 道合成的「想死但求助」题上，平均原始压力变化按 v10 的分数算是 +2.37，v9 是 −0.24，v7 是 −0.29（闸门 G8 要求不低于 0）。另有两项预注册检查，数的是这 189 题里 W 低于 1.5 的题数（G4c，通过线 ≤ 37：v10 6、v9 53、v7 37）和 W 低于 2.5 的题数（G4d，通过线 ≤ 94：v10 21、v9 102、v7 111）。这些题与为这条规则新加的训练补丁（150 对）同类（规则还套用到全语料里被检测器标出的行，改了 179 行已有标签）：说明训练起了作用，不说明这种行为能泛化。
 
-*验收状态。* 签字版预注册的 18 项检查，v10 过了 17 项。没过的那一项 G5a，当初是作为危机处理的替代指标设的；Hamo 创始人看到结果后裁定，危机处理不由本模型判定，也不由它的 W 分数判定，而是在脊柱里做。按签字的预注册，判定是**拒收**；v10 凭创始人的决定发布。这是在结果已知之后对一道预注册闸门的豁免，v10 也是连续第二个没过预注册闸门、凭创始人决定发布的版本（v9 的五道闸门没过两道）。完整说明与所报告各项检查的表格见[模型卡的 Evaluation 一节](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)。
+*验收状态。* 签字版预注册的 18 项检查，v10 过了 17 项。没过的那一项 G5a，当初是作为危机处理的替代指标设的；Hamo 创始人看到结果后裁定，危机处理不由本模型判定，也不由它的 W 分数判定，而是在脊柱里做。按签字的预注册，判定是**拒收**；v10 凭创始人的决定发布。这是在结果已知之后对一道预注册闸门的豁免，v10 也是连续第二个没过预注册闸门、凭创始人决定发布的版本（v9 的五道闸门没过两道）。完整说明与所报告各项检查的表格见模型的[技术档案的 Evaluation 一节](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)（模型卡里有链接）。
 
 *随包的闸门只是起点，不是完整筛查。* `CrisisGate` 是一份关键词表，不是模型。189 道「想死但求助」题它命中 107 道（56.6%）。请按你的人群扩充词表，在闸门旁边（而不是代替它）加第二层筛查，并在依赖它之前先在自己的数据上量出召回率。
 
@@ -299,7 +300,7 @@ v10 每一行都在预注册上限之内，在自我消融题池上远低于 v7�
 
 为什么要紧：B 在压力公式里是负权重，B 一旦翻转，系统就会把一个人交出自己的那一刻读成「减压」。不要把 v10 给出的高 B 当成「守住了边界」的证据，也不要凭任何单条原始分数采取行动：规则看平滑后的状态（`update_stress()` 每条消息只按 0.2 的比例融入），或看跨轮次的模式。产品里若有规则专门看「划边界」，先用你自己人群里的自我消融说法测一遍。
 
-**为什么我考出约 87%，而模型卡写的是 82.4%？** 两张不同的卷子、两套不同的标签。模型卡的 82.4%（v10，五维平均；q8 与 bf16 数字相同）出自真实终评，那套参照标签用的是旧的 A 口径：v10 在那张卷上的 A（327/453，±0.5 内 72.2%）衡量的是 v8 口径把 A 挪动了多远，不是准确率。
+**为什么我考出约 87%，而技术档案写的是 82.4%？** 两张不同的卷子、两套不同的标签。技术档案的 82.4%（v10，五维平均；q8 与 bf16 数字相同）出自真实终评，那套参照标签用的是旧的 A 口径：v10 在那张卷上的 A（327/453，±0.5 内 72.2%）衡量的是 v8 口径把 A 挪动了多远，不是准确率。
 
 自检卷是 195 道合成题，标签与训练标签出自同一套教师提示词，按构造就是同分布：过关认证的是**接线**（你部署的权重，服务端的模板、`num_predict` 与 stop；走的是工具包自己的提示词、采样与解析器，不是你的），不是模型水平。v10 的参考值：bf16 与随包 q8 都是 87.3%；合格带：维度级 84–90%、每一维 ≥ 75%、A ≥ 86%、JSON 合法率 ≥ 99%、危机闸门 10/10。别把 87% 读成准确率：每一维都答 0.5，在这套标签上就有 77.9%。低于合格带时，先核对跑的是哪份权重、哪套标签：A 的下限用来区分 v10 权重和 v7 权重（v7 的 A 约 80）；部署的是 v9 或 v7，要加 `--labels v9` 或 `--labels pre_v9`。详见 [eval/README.md](../eval/README.md)。
 
@@ -307,4 +308,4 @@ v10 每一行都在预注册上限之内，在自我消融题池上远低于 v7�
 
 **两份许可证分别管什么？** 本仓库的代码：Apache-2.0，没有使用限制。模型权重：HAMO-RAIL-S 1.0——可免费商用，但有四条限制（不得独立做临床判定；不得作为对可识别个人做重大决定的唯一或主要依据，也不得用于隐蔽监测；面向消费者的心理健康类部署须有独立的上游危机处理与 AI 身份披露；不得重识别）。工具包的默认管线在结构上放好了这道上游机制，但它的关键词召回有限（见「它是危机检测器吗？」），单靠它并不能让部署变得安全；展示 AI 身份披露（附现成文案）仍是你的责任。
 
-**评分不服怎么办？** 可能你是对的。参照评分器自己也不总是前后一致：2026 年 8 月的两次抽查（每次 12 条消息）里，它在 ±0.5 内复现自己维度判断的比例是 95% 和 98%。下结论之前，先看你所用版本遵循哪套口径。**A** 的含义在 v9 改过（v8 口径，至今没有真实对话上的测量），v10 沿用。**B** 在 v9 改成 crisp 口径，v10 改回 v7 及更早版本用的 legacy 口径：平静、清楚的自我陈述和说出的需要、界限一样给 B。v10 另有明确自杀意念规则；已知的 B 符号翻转见上面自我消融那一条。口径摘要见[集成指南](integration.md#升级到-v10)和[模型卡](https://huggingface.co/HamoAI/hamo-score-0.6b)。成规律的分歧请用「评分分歧」issue 模板提交，并写明模型版本或文件。我们收集这些报告，作为人工复核口径和后续版本的输入。
+**评分不服怎么办？** 可能你是对的。参照评分器自己也不总是前后一致：2026 年 8 月的两次抽查（每次 12 条消息）里，它在 ±0.5 内复现自己维度判断的比例是 95% 和 98%。下结论之前，先看你所用版本遵循哪套口径。**A** 的含义在 v9 改过（v8 口径，至今没有真实对话上的测量），v10 沿用。**B** 在 v9 改成 crisp 口径，v10 改回 v7 及更早版本用的 legacy 口径：平静、清楚的自我陈述和说出的需要、界限一样给 B。v10 另有明确自杀意念规则；已知的 B 符号翻转见上面自我消融那一条。口径摘要见[集成指南](integration.md#升级到-v10)和[技术档案](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md)。成规律的分歧请用「评分分歧」issue 模板提交，并写明模型版本或文件。我们收集这些报告，作为人工复核口径和后续版本的输入。

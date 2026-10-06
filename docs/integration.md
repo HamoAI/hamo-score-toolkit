@@ -65,7 +65,8 @@ version's shipped q8 GGUF, llama.cpp with Metal on an M1 Pro, temperature 0,
 `repeat_penalty 1.0`, `top_k 0`, `top_p 1.0`, the same exam files. Numbers
 from the real final exam and from the B and W safety exams were measured on
 each item's full stored context, not through `build_prompt`'s trimming (the
-model card says the same); the self-check exam and the 138-item serving check
+model's [technical record](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md),
+linked from the model card, says the same); the self-check exam and the 138-item serving check
 did use the trimming. So those exam numbers describe the model on full
 context, not the toolkit pipeline end to end. "The real final exam" is 453
 turns of pseudonymised conversations from three consenting internal staff
@@ -237,8 +238,8 @@ calls the spine. Under the registration as signed the verdict was
 one pre-registered gate made after the result was known, and the second
 release in a row that ships by founder decision after failing a
 pre-registered gate (v9 failed 2 of 5). Full statement and the table of
-reported checks: model card,
-[Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation).
+reported checks: technical record,
+[Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation).
 
 ## Operational wiring
 
@@ -348,7 +349,7 @@ v10 自 2026-10-06（UTC）起是 Hugging Face 上的默认权重，工具包 0.
 
 v10 另加**明确自杀意念规则**：消息含明确自杀意念时，A 封顶 1.0、B 为 0（这两条是 v10 新增），W 不低于 2.5（这条下限来自 v9 的 W 安全修复）。「v7 及更早」包括 v6.1 和社区 GGUF（`mradermacher/hamo-score-0.6b-GGUF`）；后者量化自 v4 权重，比 v10 落后四个版本（v6.1、v7、v9、v10），本页的数字都不是在它们上面测的。
 
-**本页数字的口径**（另有说明的除外）：各版本随包的 q8 GGUF，llama.cpp 加 Metal（M1 Pro），温度 0，`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`，同一批考卷文件。真实终评与 B 卷、W 安全卷上的数字，各题按存档的完整上下文打分，没有经过 `build_prompt` 的截短（模型卡同此说明）；自检卷和 138 题的服务端核对则用了截短。所以这些数字说的是完整上下文下的模型，不是工具包整条管线。「真实终评」是 453 轮假名化的对话，来自三位知情同意的内部员工，按生产口径标注（「参照标签」）。外部用户的对话从不进入训练。
+**本页数字的口径**（另有说明的除外）：各版本随包的 q8 GGUF，llama.cpp 加 Metal（M1 Pro），温度 0，`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`，同一批考卷文件。真实终评与 B 卷、W 安全卷上的数字，各题按存档的完整上下文打分，没有经过 `build_prompt` 的截短（模型的[技术档案](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md)同此说明，模型卡里有链接）；自检卷和 138 题的服务端核对则用了截短。所以这些数字说的是完整上下文下的模型，不是工具包整条管线。「真实终评」是 453 轮假名化的对话，来自三位知情同意的内部员工，按生产口径标注（「参照标签」）。外部用户的对话从不进入训练。
 
 ### v10 打的是什么
 
@@ -395,7 +396,7 @@ Hugging Face 的 `main` 现在是 v10，`from_pretrained("HamoAI/hamo-score-0.6b
 
 ### 验收状态
 
-签字的预注册方案里的 18 项检查，v10 过了 17 项。没过的那一项 G5a，当初是作为危机处理的替代指标设的；看到结果之后，创始人裁定：危机处理不由本模型判定，也不由它的 W 分数判定，而是在模型外围的确定性代码里做（Hamo 称之为「脊柱」）。按签字的预注册判定为**拒收**；v10 的发布出自创始人的决定。这是在结果已知之后对一道预注册闸门的豁免，也是连续第二个未通过预注册闸门、由创始人决定发布的版本（v9 是五道闸门没过两道）。完整说明与所报告各项检查的表格见模型卡的 [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation) 一节。
+签字的预注册方案里的 18 项检查，v10 过了 17 项。没过的那一项 G5a，当初是作为危机处理的替代指标设的；看到结果之后，创始人裁定：危机处理不由本模型判定，也不由它的 W 分数判定，而是在模型外围的确定性代码里做（Hamo 称之为「脊柱」）。按签字的预注册判定为**拒收**；v10 的发布出自创始人的决定。这是在结果已知之后对一道预注册闸门的豁免，也是连续第二个未通过预注册闸门、由创始人决定发布的版本（v9 是五道闸门没过两道）。完整说明与所报告各项检查的表格见技术档案的 [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation) 一节。
 
 ## 运维接线
 

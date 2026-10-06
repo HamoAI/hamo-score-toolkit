@@ -47,7 +47,7 @@ requires in consumer-facing mental-wellness deployments.
 >   was "rejected", and v10 is released by the founder's decision. This is a waiver of one
 >   pre-registered gate made after the result was known, and the second release in a row that
 >   ships by founder decision after failing a pre-registered gate (v9 failed 2 of 5). Full
->   statement: [model card](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation).
+>   statement: the model's [technical record](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation) (linked from the model card).
 > - **Known B sign flip.** v10 scores the self-erasure sentence 「行，我全听你的，你说哪天去就哪天去。」
 >   ("Fine, I'll do whatever you say — we go whichever day you say.") **B 2.5**, where v7 and
 >   v9 score 0 (no context; shipped q8 GGUFs, llama.cpp with Metal). v10's sign-flip counts
@@ -206,7 +206,7 @@ gate fires on 107. Extend the lists for your population and language.
 | [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md) | Sampling, crisis handling, the known B sign flip |
 | [Fine-tuning playbook](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md) | Adapting the model to your own population: data red lines, the LoRA recipe, acceptance gates, and the record of twelve adjudicated generations, five of them rejected |
 | [`examples/`](https://github.com/HamoAI/hamo-score-toolkit/tree/main/examples) | Quickstart, batch CSV scoring, a session-monitor demo with the crisis short-circuit (the last two take `--mock` to run without a model) |
-| Model card: [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation), [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals) | The verdict, the sixteen of the 18 checks that the card reports, what was decided after results were seen, and why passing the synthetic exams shows no regression inside the known range, not generalisation |
+| Technical record: [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation), [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#limitations--known-residuals) | The verdict, the sixteen of the 18 checks that the technical record reports, what was decided after results were seen, and why passing the synthetic exams shows no regression inside the known range, not generalisation |
 
 ## License
 
@@ -233,7 +233,7 @@ is your job.
 >
 > - **v10 打的是什么。** A（行动力）按 v8 口径，与 v9 相同。B（边界感）回到 v7 及更早版本所用的 **legacy 口径**，v9 那套更窄的 crisp B 不在 v10 里。新增：消息含明确的自杀意念时，v10 的训练标签把 A 封顶在 1.0、B 置 0，并落实 v9 已有的 W 下限 2.5。**各版本的分数不可相互比较**（A 的含义在 v9 改过；B 在 v9 改过，v10 又改了回来）：给每个分数存下模型版本，历史与报表按版本分开。v8 口径的 A 至今没有真实对话上的测量，依赖它之前，请先拿你自己授权对话里一批人工打分的样本核对。
 > - **关于 v9 的更正。** v9 的 B 按 crisp 口径打分，多数普通消息的 B 是 0，B 为负权重的压力公式（`hamo_score.stress` 就是一个）里减压项随之消失：453 轮真实终评上，按 v9 的分数算出的平均每轮原始压力变化是 +0.37，考卷的参照标签是 −0.68，v10 是 −0.72（假名化的内部员工对话，当事人已授权；各版本随包 q8 GGUF，llama.cpp + Metal）。重调阈值或 B 的权重都修不好，因为权重乘的是 0；把 v9 的分数喂进这类公式的，请换到 v10 或退回 v7，也不要把按 v9 分数累积的压力值带进 v10 的部署。
-> - **验收状态：按签字的预注册为「拒收」；由创始人决定发布。** 随包 q8 GGUF 在签字版预注册的 18 项检查里过了 17 项。没过的那一项 G5a 当初是作为危机处理的替代指标设的；创始人看到结果后裁定，危机处理不在本模型里判定，由脊柱负责。按签字的预注册，判定是「拒收」；v10 由创始人决定发布。这是在结果已知之后对一道预注册闸门的豁免，也是连续第二个没过预注册闸门、由创始人决定发布的版本（v9 五道闸门没过两道）。完整说明见[模型卡](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)。
+> - **验收状态：按签字的预注册为「拒收」；由创始人决定发布。** 随包 q8 GGUF 在签字版预注册的 18 项检查里过了 17 项。没过的那一项 G5a 当初是作为危机处理的替代指标设的；创始人看到结果后裁定，危机处理不在本模型里判定，由脊柱负责。按签字的预注册，判定是「拒收」；v10 由创始人决定发布。这是在结果已知之后对一道预注册闸门的豁免，也是连续第二个没过预注册闸门、由创始人决定发布的版本（v9 五道闸门没过两道）。完整说明见模型的[技术档案](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)（模型卡里有链接）。
 > - **已知的一条 B 符号翻转。** 自我消融句「行，我全听你的，你说哪天去就哪天去。」v10 打 **B 2.5**，v7 与 v9 打 0（无上下文；各版本随包 q8 GGUF，llama.cpp + Metal）。v10 的符号翻转条数在预注册的上限之内，但这一句正是此前的模型卡用来说明「仪器不可把自我消融读成边界」的例句：不要把 v10 给出的高 B 当成「守住了边界」的证据（详见 [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)）。
 > - **跑哪个模型不由 pip 版本决定。** `pip install -U hamo-score` 不换任何权重：ollama 里的模型仍跑它创建时用的那个 GGUF；`TransformersClient()` 与 `from_pretrained("HamoAI/hamo-score-0.6b")` 加载的是 Hugging Face 的 `main`，它自 2026-10-06（UTC）起是 v10，此前自 2026-09-30 起是 v9。参考服务器在 ollama 里用不带版本号的模型名 `hamo-score-0.6b`，所以用 0.3.0 执行 `docker compose up`，会把这个名字下原先的模型换成 v10。
 > - **v9、v7 仍可用。** `gguf/hamo-score-0.6b-v9.q8.gguf` 与 `gguf/hamo-score-0.6b-v7.q8.gguf` 和 v10 的文件一起放在 `main` 上，两者的 safetensors 在固定版本。摘要、版本号、怎样固定或切换（ollama、Docker、transformers）以及其余升级步骤，见[集成指南·升级到 v10](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#升级到-v10)。
@@ -253,7 +253,7 @@ is your job.
 
 默认的 `CrisisGate` 词表只是起点，不等于覆盖。新旧两份 W 安全卷合计 189 道合成的「想死但求助」题，闸门命中 107 题。请按你的人群与语言扩充词表。
 
-**细节在哪里**：[集成指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md)（正确接线、升级到 v10、关于 v9 的完整更正、固定版本与摘要、禁令清单）；[FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)（采样、危机处理、已知的 B 符号翻转）；[微调指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md)（微调到你自己的人群：数据红线、LoRA 配方、验收闸门，以及十二代经过裁定的模型的记录，其中五代拒收）；[`examples/`](https://github.com/HamoAI/hamo-score-toolkit/tree/main/examples)（快速上手、批量打分、带危机短路的会话监测演示，后两个带 `--mock`，无模型也能跑）；模型卡的 [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation) 与 [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)（判定、18 项检查里模型卡报告的 16 项、哪些事是看到结果之后才定的、为什么通过合成考卷只说明在已知范围内没有退步而不说明泛化）。
+**细节在哪里**：[集成指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md)（正确接线、升级到 v10、关于 v9 的完整更正、固定版本与摘要、禁令清单）；[FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)（采样、危机处理、已知的 B 符号翻转）；[微调指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md)（微调到你自己的人群：数据红线、LoRA 配方、验收闸门，以及十二代经过裁定的模型的记录，其中五代拒收）；[`examples/`](https://github.com/HamoAI/hamo-score-toolkit/tree/main/examples)（快速上手、批量打分、带危机短路的会话监测演示，后两个带 `--mock`，无模型也能跑）；技术档案的 [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation) 与 [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#limitations--known-residuals)（判定、18 项检查里技术档案报告的 16 项、哪些事是看到结果之后才定的、为什么通过合成考卷只说明在已知范围内没有退步而不说明泛化）。
 
 **对某个评分不服？请告诉我们——这是我们唯一请求的贡献。** [**提一条分歧报告 →**](https://github.com/HamoAI/hamo-score-toolkit/issues/new?template=score_disagreement.md)，给出消息（可自由脱敏，我们不要可识别个人的文字）、模型版本或文件、模型给的分、你认为该给的分。我们收集这些报告，作为人工复核口径与后续版本的输入。
 
