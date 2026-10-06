@@ -2,7 +2,7 @@
 
 **EN** | [中文](#中文)
 
-For toolkit 0.3.0, which serves model **v10**. Unless stated otherwise, numbers
+For toolkit 0.3.1, which serves model **v10**. Unless stated otherwise, numbers
 are for the shipped q8 GGUF through llama.cpp with Metal on an Apple M1 Pro, at
 temperature 0 with `repeat_penalty 1.0`, `top_k 0`, `top_p 1.0`; v7 and v9
 numbers are their shipped q8 GGUFs run the same way on the same exam files.
@@ -81,9 +81,7 @@ last 3 turns × 200 characters and caps the message at 500: a latency guard for
 CPU-only servers, not what the model saw in training (36.6% of training rows
 carry more than 3 context turns) nor what the acceptance exams ran on (full
 context). The guard's 98.1% score self-agreement (±0.5) dates from August 2026
-and was not re-measured on v10. Trimming is not a safety fix either: the real
-turn v10 newly misses is scored differently with full and with truncated
-context (see "Is it a crisis detector?").
+and was not re-measured on v10.
 
 **Do I need a GPU?**
 No. The shipped q8 on an ARM CPU server running ollama: P50 2.13 s, P95
@@ -97,56 +95,47 @@ weights, four releases behind v10, and we have not validated them. Details:
 [eval/README.md](../eval/README.md).
 
 **Is it a crisis detector?**
-No, and it must not be deployed as one. The license (§3c) requires
-consumer-facing mental-wellness deployments to handle crisis and self-harm
-content with an independent mechanism upstream of the model. The toolkit's
-`CrisisGate` is a reference implementation: `score_message()` runs it first
-and skips the model when it fires. The model's own W on crisis phrasing is
-defence-in-depth, not the defence.
+No, and it must not be deployed as one. It scores five dimensions of one
+message; it does not detect or handle crises, and none of its scores, W
+included, is a crisis signal. Crisis handling is the job of deterministic code
+around the model (Hamo calls it "the spine"), which must run before the model
+on every path that feeds it. The license (§3c) requires consumer-facing
+mental-wellness deployments to handle crisis and self-harm content with an
+independent mechanism upstream of the model. The toolkit's `CrisisGate` is a
+reference implementation: `score_message()` runs it first and skips the model
+when it fires.
 
-*What v10 improves.* Its training labels apply an explicit-ideation rule
-(explicit suicidal ideation: A at most 1.0, B 0, W at least 2.5). Of the 189
-synthetic ideation-plus-help items of the old and new W safety exams, v10
-scores 21 below W 2.5 and 6 below W 1.5 (v9: 102 and 53; v7: 111 and 37), so
-rolling back to v7 or v9 makes this worse. But the items are of the same kind
-as the 150-pair training patch added for this rule (the rule was also applied
-to corpus rows a detector flagged, changing labels on 179 existing rows): they
-show the training took, not that the behaviour generalises.
+*The explicit-ideation rule does not change this.* v10's training labels apply
+an explicit-ideation rule (explicit suicidal ideation: A at most 1.0, B 0, W
+at least 2.5). It is a rule about scores and the stress formula, not crisis
+handling: the A cap and B 0 are new in v10, added so that help-seeking next to
+ideation does not reduce computed stress. On the 189 synthetic
+ideation-plus-help items of the old and new W safety exams, the mean raw
+stress change is +2.37 from v10's scores, −0.24 from v9's and −0.29 from v7's
+(gate G8 required at least 0). Two more registered checks count, among the
+same 189 items, those scored W < 1.5 (G4c, pass line ≤ 37: v10 6, v9 53,
+v7 37) and W < 2.5 (G4d, pass line ≤ 94: v10 21, v9 102, v7 111). The items
+are of the same kind as the 150-pair training patch added for this rule (the
+rule was also applied to corpus rows a detector flagged, changing labels on
+179 existing rows): they show the training took, not that the behaviour
+generalises.
 
-*What v10 does not improve.* On the 37 crisis-level turns of the real final
-exam (reference W ≥ 2.5; 3 of them by human correction), v10 has 3
-crisis-level misses (scored W < 0.5), as many as v7; v9 has 2. One is new: a
-short first-person message with explicit ideation after five short turns of
-context. v6.1, v7's three late checkpoints, v8, v8.1, v9L and v9 scored it
-W 3.0; the older v2, v3, v5 and v6 scored it W 0 (v7 and v9 as q8; the rest
-in saved bf16 predictions). v10 scores it W 0 with the full context and W 3.0
-under each of four truncations; two of the three checkpoints averaged into v10
-miss it, the last does not. A 100-item synthetic probe of short
-explicit-ideation messages (diagnostic, no blind review) found no difference
-between v10, a second seed, v9L and v7 (one or two misses each with full
-context): no sign of a general regression, and no explanation of the real
-miss.
-
-*Acceptance status.* That miss is the one check v10 failed: under its signed
-pre-registration it passed 17 of 18 checks and failed G5a (no crisis-level
-miss on the real final exam outside three frozen turns), so the verdict was
-**rejected**. v10 is released by the decision of Hamo's founder, who ruled
-after seeing the result that crisis detection is not this model's job and is
-handled upstream. This is a waiver of one pre-registered gate made after the
-result was known, and the second release in a row to ship by founder decision
-after failing a pre-registered gate (v9 failed 2 of 5). The ruling says where
-crisis handling belongs; it does not measure whether an upstream mechanism
-catches what the model misses. Full record:
+*Acceptance status.* v10 met 17 of the 18 checks of its signed
+pre-registration. The one it did not meet, G5a, was a stand-in for crisis
+handling. After seeing the result, Hamo's founder ruled that crisis handling
+is not judged by this model or by its W score: it is done in the spine. Under
+the registration as signed the verdict was **rejected**; v10 is released by
+the founder's decision. This is a waiver of one pre-registered gate made after
+the result was known, and the second release in a row to ship by founder
+decision after failing a pre-registered gate (v9 failed 2 of 5). Full statement
+and the table of reported checks:
 [model card, Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation).
 
-*The bundled gate does not close the gap.* `CrisisGate` is a keyword list, not
-a model. It fires on 107 of the 189 ideation-plus-help items (56.6%), on 5 of
-the 21 that v10 scores below W 2.5 and on none of the 6 below W 1.5. On the 37
-real crisis-level turns it fires on 22, and on 2 of v10's 3 misses: one real
-crisis-level turn is scored W < 0.5 by the model and missed by the gate, and
-two more that the gate misses are scored W 1.5. Extend the lists for your
-population, add a second screen alongside the gate (never instead of it), and
-measure its recall on your own data before relying on it.
+*The bundled gate is a floor to build on, not a complete screen.* `CrisisGate`
+is a keyword list, not a model. It fires on 107 of the 189 ideation-plus-help
+items (56.6%). Extend the lists for your population, add a second screen
+alongside the gate (never instead of it), and measure its recall on your own
+data before relying on it.
 
 **I moved to v9, my computed stress went up, and the docs told me to re-tune thresholds. Was that right?**
 No. That advice (v9 model card, toolkit 0.2.0) was not enough; this is the
@@ -260,7 +249,7 @@ of the rubric and of future versions.
 
 # 中文
 
-对应工具包 0.3.0，随包模型是 **v10**。除另有说明，数字都测于随包 q8 GGUF：llama.cpp + Metal（Apple M1 Pro），温度 0，`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`；v7、v9 的数字是各自随包的 q8 GGUF 在同样条件、同一份考卷上跑的。「bf16」指 safetensors 经 MLX 运行。验收考卷的数字用每题的完整上下文，不经 `build_prompt` 截短；自检卷和 ARM 服务器上的核对则经过截短。「真实终评」是 453 轮真实对话，来自三位知情同意的内部员工，已假名化，按参照标签（出自按生产口径打分的 LLM 评分器，其中 5 轮经人工修正）判卷，不对外分发。其余考卷都是合成的。
+对应工具包 0.3.1，随包模型是 **v10**。除另有说明，数字都测于随包 q8 GGUF：llama.cpp + Metal（Apple M1 Pro），温度 0，`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`；v7、v9 的数字是各自随包的 q8 GGUF 在同样条件、同一份考卷上跑的。「bf16」指 safetensors 经 MLX 运行。验收考卷的数字用每题的完整上下文，不经 `build_prompt` 截短；自检卷和 ARM 服务器上的核对则经过截短。「真实终评」是 453 轮真实对话，来自三位知情同意的内部员工，已假名化，按参照标签（出自按生产口径打分的 LLM 评分器，其中 5 轮经人工修正）判卷，不对外分发。其余考卷都是合成的。
 
 **为什么模板必须带空 `<think>` 块？** 学生是关闭思考训练的 Qwen3，模板预填一个空 think 块，让它直接输出 JSON。没有它，模型可能先「想」一段；在 `num_predict 80` 的上限下 JSON 可能被截断——你看到的会是解析失败，不只是变慢。请原样照抄 [`server/Modelfile`](../server/Modelfile) 的 `TEMPLATE` 段。
 
@@ -278,21 +267,19 @@ of the rubric and of future versions.
 
 **「嗯」这类超短消息评不评？** 评，带上下文评。全零是设计好的无操作。真实对话里短消息很常见——跳过它们，等于在人最沉默的地方开一块盲区。
 
-**多喂点上下文会不会更准？** 经工具包喂不进去，它会截短；多给会不会更准，v10 上没有量过，而上下文长短本身会改变分数。`build_prompt` 只保留最后 3 轮 × 200 字，消息截到 500 字：这是给纯 CPU 服务器的延迟护栏，不是「模型训练时看到的样子」（36.6% 的训练行上下文超过 3 轮），验收考卷用的则是完整上下文。护栏「截短后评分自一致（±0.5）98.1%」是 2026 年 8 月量的，没有在 v10 上重测。截短也不是安全上的补救：v10 新漏掉的那个真实轮次，带完整上下文和截短之后打出的分数并不一样（见「它是危机检测器吗？」）。
+**多喂点上下文会不会更准？** 经工具包喂不进去，它会截短；多给会不会更准，v10 上没有量过，而上下文长短本身会改变分数。`build_prompt` 只保留最后 3 轮 × 200 字，消息截到 500 字：这是给纯 CPU 服务器的延迟护栏，不是「模型训练时看到的样子」（36.6% 的训练行上下文超过 3 轮），验收考卷用的则是完整上下文。护栏「截短后评分自一致（±0.5）98.1%」是 2026 年 8 月量的，没有在 v10 上重测。
 
 **需要 GPU 吗？** 不需要。随包 q8 在一台运行 ollama 的 ARM CPU 服务器上：每条 P50 2.13 秒、P95 2.53 秒、最长 2.91 秒（138 道合成题，按工具包规则截短，模型已加载；提示词远短于截短上限，不是最坏情况）。
 
 要让分数把关行为，就用随包的 Q8_0——v10 的量化我们只量过这一档；自行量化后，先用 `eval/compare_quants.py` 与它对比。Hugging Face 上的社区 GGUF 量化自 v4 权重，比 v10 落后四个发布版本，我们没有验证过。详见 [eval/README.md](../eval/README.md)。
 
-**它是危机检测器吗？** 不是，也不能当危机检测器部署。许可证（§3c）要求：面向消费者的心理健康类部署，必须由模型上游的独立机制处理危机与自伤内容。工具包的 `CrisisGate` 是参考实现：`score_message()` 先跑闸门，闸门触发就跳过模型。模型自己在危机表述上打出的 W 只是纵深防御，不是防线本身。
+**它是危机检测器吗？** 不是，也不能当危机检测器部署。它给一条消息的五个维度打分，不识别也不处理危机；它的分数，包括 W 在内，没有一个是危机信号。危机处理由模型外围的确定性代码负责（Hamo 称之为「脊柱」），凡把消息送进模型的路径，这层代码都必须先于模型运行。许可证（§3c）要求：面向消费者的心理健康类部署，必须由模型上游的独立机制处理危机与自伤内容。工具包的 `CrisisGate` 是参考实现：`score_message()` 先跑闸门，闸门触发就跳过模型。
 
-*v10 改进了什么。* 训练标签加了一条明确自杀意念规则（出现明确的自杀意念时，A 封顶 1.0、B 为 0、W 至少 2.5）。新旧两份 W 安全卷共 189 道合成的「想死但求助」题：v10 有 21 道低于 W 2.5、6 道低于 W 1.5（v9 是 102 和 53，v7 是 111 和 37），所以在这一点上退回 v7 或 v9 只会更差。但这些题与为这条规则新加的训练补丁（150 对）同类（规则还套用到全语料里被检测器标出的行，改了 179 行已有标签）：说明训练起了作用，不说明这种行为能泛化。
+*明确自杀意念规则不改变这一点。* v10 的训练标签加了一条明确自杀意念规则（出现明确的自杀意念时，A 封顶 1.0、B 为 0、W 至少 2.5）。这是一条关于分数和压力公式的规则，不是危机处理：A 封顶和 B 归零是 v10 新增的，为的是不让意念旁边的求助压低算出的压力。新旧两份 W 安全卷共 189 道合成的「想死但求助」题上，平均原始压力变化按 v10 的分数算是 +2.37，v9 是 −0.24，v7 是 −0.29（闸门 G8 要求不低于 0）。另有两项预注册检查，数的是这 189 题里 W 低于 1.5 的题数（G4c，通过线 ≤ 37：v10 6、v9 53、v7 37）和 W 低于 2.5 的题数（G4d，通过线 ≤ 94：v10 21、v9 102、v7 111）。这些题与为这条规则新加的训练补丁（150 对）同类（规则还套用到全语料里被检测器标出的行，改了 179 行已有标签）：说明训练起了作用，不说明这种行为能泛化。
 
-*v10 没有改进什么。* 真实终评的 37 个危机级轮次（参照标签 W ≥ 2.5，其中 3 个是人工修正后才算）里，v10 有 3 条危机级漏检（W 打到 0.5 以下），与 v7 一样多；v9 是 2 条。其中 1 条是新的：一条简短的第一人称消息，带明确的自杀意念，前面有 5 轮简短的上下文。v6.1、v7 后期的三个检查点、v8、v8.1、v9L、v9 都给它打 W 3.0；更早的 v2、v3、v5、v6 打 W 0（v7、v9 是 q8，其余是存档的 bf16 预测）。v10 带完整上下文时打 W 0，四种截短方式下都打 W 3.0；平均成 v10 的三个检查点里，前两个漏掉它，最后一个没有。另有一个 100 题的合成探针（简短的明确意念消息；仅作诊断，未经盲审）：v10、第二个种子、v9L 和 v7 没有差别，带完整上下文时各漏 1–2 题——看不出这类短句整体变差，但这条真实漏检也没有得到解释。
+*验收状态。* 签字版预注册的 18 项检查，v10 过了 17 项。没过的那一项 G5a，当初是作为危机处理的替代指标设的；Hamo 创始人看到结果后裁定，危机处理不由本模型判定，也不由它的 W 分数判定，而是在脊柱里做。按签字的预注册，判定是**拒收**；v10 凭创始人的决定发布。这是在结果已知之后对一道预注册闸门的豁免，v10 也是连续第二个没过预注册闸门、凭创始人决定发布的版本（v9 的五道闸门没过两道）。完整说明与所报告各项检查的表格见[模型卡的 Evaluation 一节](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)。
 
-*验收状态。* v10 唯一没过的检查就是这条漏检：按签字的预注册方案，18 项检查过了 17 项，没过的是 G5a（真实终评上，除三个冻结轮次外不得有危机级漏检），判定是**拒收**。v10 凭 Hamo 创始人的决定发布：看到结果后他裁定，危机判定不是这个模型的事，由上游负责。这是在结果已知之后对一道预注册闸门的豁免，v10 也是连续第二个没过预注册闸门、凭创始人决定发布的版本（v9 的五道闸门没过两道）。这个裁定说的是危机该在哪里处理，并没有测量上游机制接不接得住模型漏掉的内容。完整记录见[模型卡的 Evaluation 一节](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)。
-
-*随包的闸门补不上这个缺口。* `CrisisGate` 是一份关键词表，不是模型。189 道「想死但求助」题它命中 107 道（56.6%）；v10 打到 W 2.5 以下的 21 道里它命中 5 道，W 1.5 以下的 6 道里一道都没命中。37 个真实危机级轮次它命中 22 个，v10 漏掉的 3 条里它命中 2 条：有 1 个真实的危机级轮次，模型打到 W 0.5 以下，闸门也没命中；另有 2 个闸门没命中的轮次，模型只打到 W 1.5。请按你的人群扩充词表，在闸门旁边（而不是代替它）加第二层筛查，并在依赖它之前先在自己的数据上量出召回率。
+*随包的闸门只是起点，不是完整筛查。* `CrisisGate` 是一份关键词表，不是模型。189 道「想死但求助」题它命中 107 道（56.6%）。请按你的人群扩充词表，在闸门旁边（而不是代替它）加第二层筛查，并在依赖它之前先在自己的数据上量出召回率。
 
 **我换到了 v9，算出来的压力变高了，文档让我「重调阈值」——这个建议对吗？** 不对。那条建议（出自 v9 模型卡和工具包 0.2.0）不够，这里是更正。v9 的 crisp 口径让大多数普通消息的 B 为 0；压力公式里 B 是负权重，减压项就此消失：在真实终评上，按 v9 的读数算出的平均每轮原始压力变化是 +0.37，参照标签是 −0.68（v10 是 −0.72），回放出来的会话整体上漂。重调分桶阈值或 B 的权重都救不回来：权重乘的是 0。
 

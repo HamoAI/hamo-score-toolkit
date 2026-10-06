@@ -23,7 +23,7 @@ from .prompt import build_prompt, STUDENT_PROMPT
 from .safety import CrisisGate, CrisisResult, DISCLOSURE_EN, DISCLOSURE_ZH
 from .stress import energy_state, update_stress
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __all__ = [
     "OllamaClient", "TransformersClient", "ScoreResult", "score_message",
     "parse_scores", "DIMS", "build_prompt", "STUDENT_PROMPT",

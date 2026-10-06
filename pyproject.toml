@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hamo-score"
-version = "0.3.0"
+version = "0.3.1"
 description = "Client toolkit and safety scaffold for the HamoAI/hamo-score-0.6b conversational pulse-taking model"
 readme = "README.md"
 license = { text = "Apache-2.0" }

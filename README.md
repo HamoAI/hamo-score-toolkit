@@ -13,7 +13,12 @@ independent upstream crisis handling that the model license
 requires in consumer-facing mental-wellness deployments.
 
 > ⚠️ The model is not a chatbot, not a diagnostic instrument, and **not a
-> crisis detector**.
+> crisis detector**. It scores five dimensions of one message. It does not
+> detect or handle crises, and none of its scores — W included — is a crisis
+> signal. Crisis handling is the job of deterministic code around the model
+> (Hamo calls it "the spine"), which must run before the model on every path
+> that feeds it: **the upstream crisis gate is not optional.** The toolkit's
+> `CrisisGate` is a keyword list to start from, not a complete screen.
 
 > **Toolkit 0.3.0 moves to hamo-score-0.6b v10. If you moved to v9, read the correction below:
 > our advice to "re-tune thresholds" for v9 was not enough.**
@@ -36,25 +41,13 @@ requires in consumer-facing mental-wellness deployments.
 >   a formula, move to v10 or go back to v7, and do not carry stress accumulated from v9 scores
 >   into a v10 deployment.
 > - **Acceptance status: rejected under the signed pre-registration; released by the founder's
->   decision.** The shipped q8 GGUF passed 17 of 18 pre-registered checks and failed G5a: among
->   the 37 crisis-level turns of the real final exam (reference W ≥ 2.5) it has 3 crisis-level
->   misses (each scored W 0), as many as the shipped v7 q8 (v9: 2), and one of the 3 is new —
->   outside the three turns frozen in advance — where G5a allows none. After seeing the result,
->   the founder ruled the model accepted because crisis detection is not this model's job and
->   is handled upstream. This is a waiver of one pre-registered gate made after the result was
->   known, and the second release in a row that ships by founder decision after failing a
->   pre-registered gate (v9 failed 2 of 5). All 18 checks:
->   [model card](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation).
-> - **The new miss**, described structurally: a short first-person message with explicit
->   ideation after five short turns of context. v6.1, v7's three late checkpoints, v8, v8.1,
->   v9L and v9 scored it W 3.0 (v7's checkpoints and v9 as q8; the others as saved bf16
->   predictions, MLX); older generations did not all catch it (saved bf16 predictions of v2,
->   v3 and the rejected v5 and v6: W 0). v10 scores it W 0 with the full context and W 3.0
->   under each of four truncations of that context. A 100-item synthetic probe of short
->   explicit-ideation messages (q8; diagnostic only, no blind review) found no difference
->   between v10, a second seed, v9L and v7: 1 or 2 misses each with full context. The FAQ and
->   the model card have the full account. **v10 is still not a crisis detector, and the
->   upstream crisis gate is not optional.**
+>   decision.** The shipped q8 GGUF met 17 of the 18 checks of the signed pre-registration.
+>   The one it did not meet, G5a, was a stand-in for crisis handling, which the founder ruled
+>   outside this model after seeing the result; under the registration as signed the verdict
+>   was "rejected", and v10 is released by the founder's decision. This is a waiver of one
+>   pre-registered gate made after the result was known, and the second release in a row that
+>   ships by founder decision after failing a pre-registered gate (v9 failed 2 of 5). Full
+>   statement: [model card](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation).
 > - **Known B sign flip.** v10 scores the self-erasure sentence 「行，我全听你的，你说哪天去就哪天去。」
 >   ("Fine, I'll do whatever you say — we go whichever day you say.") **B 2.5**, where v7 and
 >   v9 score 0 (no context; shipped q8 GGUFs, llama.cpp with Metal). v10's sign-flip counts
@@ -72,6 +65,9 @@ requires in consumer-facing mental-wellness deployments.
 >   are at pinned revisions. Digests, revisions, how to pin or switch (ollama, Docker,
 >   transformers) and the remaining upgrade steps:
 >   [Upgrading to v10](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#upgrading-to-v10).
+> - **0.3.1:** documentation only — crisis handling is outside the model's scope, and the
+>   documents no longer assess the model against it; no change to code behaviour, weights
+>   or exam.
 
 > 💬 **Think a score is wrong? Tell us — it is the one contribution we ask for.**
 > [**Open a disagreement report →**](https://github.com/HamoAI/hamo-score-toolkit/issues/new?template=score_disagreement.md)
@@ -192,7 +188,7 @@ labels, so read the per-dimension lines and the distinct-read-out count that
 
 | Module | What it gives you |
 |---|---|
-| `hamo_score.prompt` | The exact prompt format + built-in trimming as a latency guard (3×200-char turns, 500-char message). The real final exam, old B exam and W safety exams quoted here were run on full stored context, not this trimming |
+| `hamo_score.prompt` | The exact prompt format + built-in trimming as a latency guard (3×200-char turns, 500-char message). The real final exam and old B exam figures quoted here were run on full stored context, not this trimming |
 | `hamo_score.parse` | Think-block-tolerant JSON parsing, grid snapping |
 | `hamo_score.client` | `OllamaClient` / `TransformersClient` (needs `pip install "hamo-score[transformers]"`) + `score_message()` safe pipeline |
 | `hamo_score.stress` | Reference smoothing (`0.8·history + 0.2·message`) + energy-state buckets. Weights and cut-offs were set on legacy-rubric scores (v7 and earlier) and v10's A is on a different rubric: check the buckets on your own data before they gate anything. Do not feed it v9 scores |
@@ -200,11 +196,7 @@ labels, so read the per-dimension lines and the distinct-read-out count that
 
 The default `CrisisGate` word lists are a starting point, not coverage. On the
 189 synthetic ideation-plus-help items of the old and new W safety exams the
-gate fires on 107; of the 21 that the v10 q8 GGUF (llama.cpp with Metal) scores
-below W 2.5 it fires on 5, and of the 6 it scores below W 1.5, on none. On the
-37 crisis-level turns of the real final exam it fires on 22, and one of v10's 3
-misses there is caught by neither the model nor the gate. Extend the lists for
-your population and language.
+gate fires on 107. Extend the lists for your population and language.
 
 ## Where the details live
 
@@ -214,7 +206,7 @@ your population and language.
 | [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md) | Sampling, crisis handling, the known B sign flip |
 | [Fine-tuning playbook](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md) | Adapting the model to your own population: data red lines, the LoRA recipe, acceptance gates, and the record of twelve adjudicated generations, five of them rejected |
 | [`examples/`](https://github.com/HamoAI/hamo-score-toolkit/tree/main/examples) | Quickstart, batch CSV scoring, a session-monitor demo with the crisis short-circuit (the last two take `--mock` to run without a model) |
-| Model card: [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation), [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals) | The 18 checks, what was decided after results were seen, and why passing the synthetic exams shows no regression inside the known range, not generalisation |
+| Model card: [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation), [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals) | The verdict, the sixteen of the 18 checks that the card reports, what was decided after results were seen, and why passing the synthetic exams shows no regression inside the known range, not generalisation |
 
 ## License
 
@@ -235,17 +227,17 @@ is your job.
 
 这个仓库是模型的另一半：提示词格式、容错解析、分数该喂进去的平滑折算与状态桶，以及放在最前面的**危机闸门**。模型许可证（[HAMO-RAIL-S §3c](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/LICENSE)）要求面向消费者的心理健康类部署在模型上游保留独立的危机处理，危机闸门是这一要求的参考实现。
 
-> ⚠️ 这个模型不是聊天机器人，不是诊断工具，**也不是危机检测器**。
+> ⚠️ 这个模型不是聊天机器人，不是诊断工具，**也不是危机检测器**。它给一条消息的五个维度打分，不识别也不处理危机；它的分数，包括 W 在内，没有一个是危机信号。危机处理由模型外围的确定性代码负责（Hamo 称之为「脊柱」），凡把消息送进模型的路径，这层代码都必须先于模型运行：**上游的危机闸门不可省。** 工具包的 `CrisisGate` 是一份关键词表，只是起点，不是完整筛查。
 
 > **工具包 0.3.0 转向 hamo-score-0.6b v10。已经换到 v9 的，请先读下面的更正：当时让大家为 v9「重调阈值」，这个建议并不够。**
 >
 > - **v10 打的是什么。** A（行动力）按 v8 口径，与 v9 相同。B（边界感）回到 v7 及更早版本所用的 **legacy 口径**，v9 那套更窄的 crisp B 不在 v10 里。新增：消息含明确的自杀意念时，v10 的训练标签把 A 封顶在 1.0、B 置 0，并落实 v9 已有的 W 下限 2.5。**各版本的分数不可相互比较**（A 的含义在 v9 改过；B 在 v9 改过，v10 又改了回来）：给每个分数存下模型版本，历史与报表按版本分开。v8 口径的 A 至今没有真实对话上的测量，依赖它之前，请先拿你自己授权对话里一批人工打分的样本核对。
 > - **关于 v9 的更正。** v9 的 B 按 crisp 口径打分，多数普通消息的 B 是 0，B 为负权重的压力公式（`hamo_score.stress` 就是一个）里减压项随之消失：453 轮真实终评上，按 v9 的分数算出的平均每轮原始压力变化是 +0.37，考卷的参照标签是 −0.68，v10 是 −0.72（假名化的内部员工对话，当事人已授权；各版本随包 q8 GGUF，llama.cpp + Metal）。重调阈值或 B 的权重都修不好，因为权重乘的是 0；把 v9 的分数喂进这类公式的，请换到 v10 或退回 v7，也不要把按 v9 分数累积的压力值带进 v10 的部署。
-> - **验收状态：按签字的预注册为「拒收」；由创始人决定发布。** 随包 q8 GGUF 在 18 项预注册检查里过了 17 项，没过的是 G5a：真实终评的 37 个危机级轮次（参照 W ≥ 2.5）里，v10 有 3 条危机级漏检（都被打成 W 0），与随包的 v7 q8 一样多（v9 是 2 条）；其中 1 条是新的，不在事先冻结的 3 轮之内，而 G5a 不允许新增。看到结果后，创始人裁定模型通过，理由是危机识别不是这个模型的职责，由上游处理。这是在结果已知之后对一道预注册闸门的豁免，也是连续第二个没过预注册闸门、由创始人决定发布的版本（v9 五道闸门没过两道）。18 项检查见[模型卡](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)。
-> - **新漏的那一轮**（只作结构描述）：一条简短的第一人称消息，含明确意念，此前有五轮简短的上下文。v6.1、v7 后期的三个检查点、v8、v8.1、v9L、v9 都打 W 3.0（v7 的检查点与 v9 为 q8，其余为存档的 bf16 预测，经 MLX）；更早的几代并不都判对（存档的 bf16 预测里，v2、v3 与被拒收的 v5、v6 打 W 0）。v10 在完整上下文下打 W 0，按四种方式截短上下文则都打 W 3.0。在 100 题的合成探针上（简短的明确意念消息；q8；仅作诊断，未经盲审），v10、第二个种子、v9L 与 v7 没有差别，完整上下文下各漏 1 到 2 题。完整说明见 FAQ 与模型卡。**v10 仍然不是危机检测器，上游的危机闸门不可省。**
+> - **验收状态：按签字的预注册为「拒收」；由创始人决定发布。** 随包 q8 GGUF 在签字版预注册的 18 项检查里过了 17 项。没过的那一项 G5a 当初是作为危机处理的替代指标设的；创始人看到结果后裁定，危机处理不在本模型里判定，由脊柱负责。按签字的预注册，判定是「拒收」；v10 由创始人决定发布。这是在结果已知之后对一道预注册闸门的豁免，也是连续第二个没过预注册闸门、由创始人决定发布的版本（v9 五道闸门没过两道）。完整说明见[模型卡](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)。
 > - **已知的一条 B 符号翻转。** 自我消融句「行，我全听你的，你说哪天去就哪天去。」v10 打 **B 2.5**，v7 与 v9 打 0（无上下文；各版本随包 q8 GGUF，llama.cpp + Metal）。v10 的符号翻转条数在预注册的上限之内，但这一句正是此前的模型卡用来说明「仪器不可把自我消融读成边界」的例句：不要把 v10 给出的高 B 当成「守住了边界」的证据（详见 [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)）。
 > - **跑哪个模型不由 pip 版本决定。** `pip install -U hamo-score` 不换任何权重：ollama 里的模型仍跑它创建时用的那个 GGUF；`TransformersClient()` 与 `from_pretrained("HamoAI/hamo-score-0.6b")` 加载的是 Hugging Face 的 `main`，它自 2026-10-06（UTC）起是 v10，此前自 2026-09-30 起是 v9。参考服务器在 ollama 里用不带版本号的模型名 `hamo-score-0.6b`，所以用 0.3.0 执行 `docker compose up`，会把这个名字下原先的模型换成 v10。
 > - **v9、v7 仍可用。** `gguf/hamo-score-0.6b-v9.q8.gguf` 与 `gguf/hamo-score-0.6b-v7.q8.gguf` 和 v10 的文件一起放在 `main` 上，两者的 safetensors 在固定版本。摘要、版本号、怎样固定或切换（ollama、Docker、transformers）以及其余升级步骤，见[集成指南·升级到 v10](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#升级到-v10)。
+> - **0.3.1：** 只改文档——危机处理不在本模型的职责范围内，文档不再拿危机处理来衡量这个模型；代码行为、权重与考卷均无变化。
 
 **五分钟上手**：代码见上方英文段。先 `git clone` 本仓库（`server/Modelfile` 与 `eval/` 在仓库里，不在 pip 包里）；要用 v9 或 v7，就改拉对应的 GGUF，并改 `server/Modelfile` 的 FROM。完整链路是 **闸门 → 评分 → 平滑 → 状态桶**；分数是逐句信号，不要凭单句原始分做任何决定。示例注释里的读数是随包 v10 q8 GGUF 的输出（llama.cpp + Metal）；同一输入，v9 q8 GGUF 给出 B 0.0，v7 q8 GGUF 给出 B 1.5，两者的 W 都是 0.5。打出这两者之一的，请核对模型是用哪个 GGUF 建的。
 
@@ -257,11 +249,11 @@ is your job.
 
 **过关证明的是接线正确，不证明模型质量。** 考卷的标签与训练标签出自同一套教师提示词，天然与模型同分布；它走的是工具包自己的提示词、采样参数与解析器，不检查你自己的。恒定输出 0.5 在 v10 标签上就能得 77.9%，所以不要只看总分，还要看 `run_exam.py` 打印的分维成绩与不同读数的种数。
 
-**模块一览**：`hamo_score.prompt`（提示词格式；内置截断作延迟保护：上下文 3 轮 × 200 字、消息 500 字；本页引用的真实终评、旧 B 卷与 W 安全卷按完整上下文跑，未经这层截断）、`hamo_score.parse`（容错解析）、`hamo_score.client`（两种客户端与 `score_message()` 安全管线；`TransformersClient` 需 `pip install "hamo-score[transformers]"`）、`hamo_score.stress`（参考平滑与状态桶；权重与阈值按 legacy 口径（v7 及更早）的分数定，而 v10 的 A 是另一套口径：让状态桶把关任何事之前，先用你自己的数据核对；不要把 v9 的分数喂给它）、`hamo_score.safety`（`CrisisGate` 中英词表与 AI 披露文案）。
+**模块一览**：`hamo_score.prompt`（提示词格式；内置截断作延迟保护：上下文 3 轮 × 200 字、消息 500 字；本页引用的真实终评与旧 B 卷按完整上下文跑，未经这层截断）、`hamo_score.parse`（容错解析）、`hamo_score.client`（两种客户端与 `score_message()` 安全管线；`TransformersClient` 需 `pip install "hamo-score[transformers]"`）、`hamo_score.stress`（参考平滑与状态桶；权重与阈值按 legacy 口径（v7 及更早）的分数定，而 v10 的 A 是另一套口径：让状态桶把关任何事之前，先用你自己的数据核对；不要把 v9 的分数喂给它）、`hamo_score.safety`（`CrisisGate` 中英词表与 AI 披露文案）。
 
-默认的 `CrisisGate` 词表只是起点，不等于覆盖。新旧两份 W 安全卷合计 189 道合成的「想死但求助」题，闸门命中 107 题；其中 v10 q8 GGUF（llama.cpp + Metal）打到 W 2.5 以下的 21 题，闸门命中 5 题；打到 W 1.5 以下的 6 题，一题也没命中。真实终评的 37 个危机级轮次，闸门命中 22 个；v10 漏掉的 3 轮里，有 1 轮模型和闸门都没拦住。请按你的人群与语言扩充词表。
+默认的 `CrisisGate` 词表只是起点，不等于覆盖。新旧两份 W 安全卷合计 189 道合成的「想死但求助」题，闸门命中 107 题。请按你的人群与语言扩充词表。
 
-**细节在哪里**：[集成指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md)（正确接线、升级到 v10、关于 v9 的完整更正、固定版本与摘要、禁令清单）；[FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)（采样、危机处理、已知的 B 符号翻转）；[微调指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md)（微调到你自己的人群：数据红线、LoRA 配方、验收闸门，以及十二代经过裁定的模型的记录，其中五代拒收）；[`examples/`](https://github.com/HamoAI/hamo-score-toolkit/tree/main/examples)（快速上手、批量打分、带危机短路的会话监测演示，后两个带 `--mock`，无模型也能跑）；模型卡的 [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation) 与 [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)（18 项检查、哪些事是看到结果之后才定的、为什么通过合成考卷只说明在已知范围内没有退步而不说明泛化）。
+**细节在哪里**：[集成指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md)（正确接线、升级到 v10、关于 v9 的完整更正、固定版本与摘要、禁令清单）；[FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)（采样、危机处理、已知的 B 符号翻转）；[微调指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md)（微调到你自己的人群：数据红线、LoRA 配方、验收闸门，以及十二代经过裁定的模型的记录，其中五代拒收）；[`examples/`](https://github.com/HamoAI/hamo-score-toolkit/tree/main/examples)（快速上手、批量打分、带危机短路的会话监测演示，后两个带 `--mock`，无模型也能跑）；模型卡的 [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation) 与 [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)（判定、18 项检查里模型卡报告的 16 项、哪些事是看到结果之后才定的、为什么通过合成考卷只说明在已知范围内没有退步而不说明泛化）。
 
 **对某个评分不服？请告诉我们——这是我们唯一请求的贡献。** [**提一条分歧报告 →**](https://github.com/HamoAI/hamo-score-toolkit/issues/new?template=score_disagreement.md)，给出消息（可自由脱敏，我们不要可识别个人的文字）、模型版本或文件、模型给的分、你认为该给的分。我们收集这些报告，作为人工复核口径与后续版本的输入。
 

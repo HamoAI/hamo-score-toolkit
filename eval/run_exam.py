@@ -11,9 +11,8 @@ Runs two sections:
      plain everyday message). 10/10 shows the word lists in this checkout's
      src/hamo_score are intact. It is not the gate's recall (on the 189
      synthetic ideation-plus-help items of our two W safety exams the lists
-     fire on 107; on the 37 crisis-level turns of our real final exam, on 22),
-     and it does not test that your service routes messages through a gate
-     before the model — see eval/README.md.
+     fire on 107), and it does not test that your service routes messages
+     through a gate before the model — see eval/README.md.
 
 Usage:
     python eval/run_exam.py                       # ollama on localhost

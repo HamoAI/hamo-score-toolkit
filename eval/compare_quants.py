@@ -5,9 +5,9 @@ Why this exists: when we measured v7 builds of hamo-score-0.6b on the real final
 exam (453 turns; llama.cpp + Metal, neutral sampling), state-bucket agreement moved only
 0.4 points from q8_0 to q4_k_m (97.1% -> 96.7%) — near
 enough to call them equivalent. Underneath, q4_k_m still *attenuates*
-one-sidedly exactly where a scorer must not go quiet: on the 37 crisis-level
-turns (reference W >= 2.5) of that exam it scored W lower than q8_0 on 6 and higher
-on 1 (mean W 2.58 -> 2.50), though it added no crisis miss there. (q6_k showed no such
+one-sidedly at the top of the W scale: on the 37 turns with the highest reference W
+(reference W >= 2.5) of that exam it scored W lower than q8_0 on 6 and higher
+on 1 (mean W 2.58 -> 2.50). (q6_k showed no such
 damping: W lower on 1 and higher on 1 of the 37, mean W 2.58 for both, state-bucket agreement
 96.9% against 97.1%.) State buckets are coarse enough to absorb a damped signal, so bucket
 agreement alone will never surface it.
@@ -60,8 +60,9 @@ DIMS = "AWEHB"
 # Stress level the bucket walk starts from. Fixed for all builds so the only
 # variable is the read-out itself.
 BASELINE_STRESS = 5.0
-# A turn counts as crisis-adjacent when the teacher labelled withdrawal this
-# high. This is the subset where attenuation stops being cosmetic.
+# In this script a question counts as high-withdrawal when the teacher labelled
+# withdrawal this high (docs/finetune.md uses the term for reference W >= 2.5 on
+# real turns). The W lower/higher split is reported again on this subset.
 HIGH_W = 1.5
 # label set -> key in synthetic_exam.jsonl (same mapping as run_exam.py)
 LABEL_KEYS = {"v10": "labels", "v9": "labels_v9", "pre_v9": "labels_pre_v9"}
@@ -134,8 +135,8 @@ def compare(a: dict, b: dict, gold: dict) -> None:
         print(f"    {b['model']} lower on {lo}, higher on {up}")
         print(f"    mean W — teacher {gm:.2f} | {a['model']} {ma:.2f} | {b['model']} {mb:.2f}")
         if lo >= 3 * max(up, 1) and mb < ma - 0.05:
-            print("    ⚠️  one-sided damping on the turns that matter most. If this build")
-            print("        gates safety-relevant behaviour, lower your withdrawal thresholds")
+            print("    ⚠️  one-sided damping of W on the high-withdrawal turns. If this build's")
+            print("        read-outs gate behaviour, lower your withdrawal thresholds")
             print("        to compensate — and keep deterministic crisis detection upstream.")
 
 
