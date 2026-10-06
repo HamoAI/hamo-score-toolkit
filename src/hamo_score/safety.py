@@ -1,10 +1,11 @@
 """Crisis gate — the non-negotiable upstream guard.
 
-hamo-score is NOT a crisis detector, and the model license (HAMO-RAIL-S §3c)
-requires consumer-facing deployments to handle crisis content with an
-independent deterministic mechanism UPSTREAM of the model. This module is the
-reference implementation of that pattern: a keyword gate that runs BEFORE
-scoring and short-circuits the pipeline when triggered.
+hamo-score is NOT a crisis detector. The model license (HAMO-RAIL-S §3c) allows
+consumer-facing mental-wellness deployments only if crisis and self-harm content
+is handled by an independent mechanism UPSTREAM of the model and the deployment
+discloses that an AI system is in use. We recommend a deterministic mechanism;
+this module is the reference implementation of that pattern: a keyword gate that
+runs BEFORE scoring and short-circuits the pipeline when triggered.
 
 The gate is deliberately simple, deterministic, and auditable. Extend the
 word lists for your population; never replace this layer with a model.

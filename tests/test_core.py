@@ -48,8 +48,9 @@ def test_crisis_gate_short_circuits():
 def test_ollama_client_pins_neutral_sampling():
     """Every request must carry neutral sampling, whatever the server's Modelfile says.
 
-    Regression guard: ollama's default repeat_penalty 1.1 roughly doubled the
-    fabrication rate. Intercepts the real HTTP payload OllamaClient sends.
+    Regression guard: ollama's default repeat_penalty 1.1 raised the fabrication
+    rate in every version we measured (v10 q8: 2.9% -> 14.4%). Intercepts the
+    real HTTP payload OllamaClient sends.
     """
     import json
     import urllib.request
@@ -81,6 +82,25 @@ def test_ollama_client_pins_neutral_sampling():
     assert opts["repeat_penalty"] == 1.0, "repeat penalty inflates scores away from 0"
     assert opts["top_k"] == 0 and opts["top_p"] == 1.0
     assert sent["keep_alive"] == -1
+
+
+
+def test_exam_label_sets():
+    """Every self-check question carries all three label sets, and both exam scripts map to them."""
+    import importlib.util, json, os
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    rows = [json.loads(l) for l in open(os.path.join(root, "eval", "synthetic_exam.jsonl"))]
+    assert len(rows) == 195
+    keys = None
+    for name in ("run_exam", "compare_quants"):
+        spec = importlib.util.spec_from_file_location(name, os.path.join(root, "eval", name + ".py"))
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        assert list(mod.LABEL_KEYS)[0] == "v10"          # the default label set is the served version's
+        keys = keys or mod.LABEL_KEYS
+        assert mod.LABEL_KEYS == keys
+    for r in rows:
+        for key in keys.values():
+            assert set(r[key]) == set("AWEHB") and all(0.0 <= r[key][d] <= 3.0 for d in "AWEHB")
 
 
 if __name__ == "__main__":

@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """Compare quantization builds — including the damage a headline number hides.
 
-Why this exists: when we measured v7 builds of hamo-score-0.6b against our
-internal 453-turn final exam (llama.cpp, neutral sampling), state-bucket
-agreement moved only 0.4 points from q8_0 to q4_k_m (97.1% -> 96.7%) — near
+Why this exists: when we measured v7 builds of hamo-score-0.6b on the real final
+exam (453 turns; llama.cpp + Metal, neutral sampling), state-bucket agreement moved only
+0.4 points from q8_0 to q4_k_m (97.1% -> 96.7%) — near
 enough to call them equivalent. Underneath, q4_k_m still *attenuates*
-one-sidedly exactly where a scorer must not go quiet: on the 37 crisis-adjacent
-turns (gold W >= 2.5) of that split it scored W lower than q8_0 on 6 and higher
-on 1 (mean W 2.58 -> 2.50), though it added no crisis miss there. (q6_k was indistinguishable
-from q8_0.) State buckets are coarse enough to absorb a damped signal, so bucket
+one-sidedly exactly where a scorer must not go quiet: on the 37 crisis-level
+turns (reference W >= 2.5) of that exam it scored W lower than q8_0 on 6 and higher
+on 1 (mean W 2.58 -> 2.50), though it added no crisis miss there. (q6_k showed no such
+damping: W lower on 1 and higher on 1 of the 37, mean W 2.58 for both, state-bucket agreement
+96.9% against 97.1%.) State buckets are coarse enough to absorb a damped signal, so bucket
 agreement alone will never surface it.
 
 An earlier version of this note cited a larger gap ("every dimension drifts
 toward zero"); that compared our v6.1 q8_0 against community GGUF builds made
 from older (v4) weights, so it was mostly a version gap, not a quantization gap.
-See eval/README.md for the v7 table (quantization has not yet been re-measured on v9).
+See eval/README.md for the v7 table (quantization has not been re-measured on v9 or v10).
 
 This script runs the toolkit's synthetic exam against two or more deployments
 and reports three things per pair:
@@ -22,15 +23,16 @@ and reports three things per pair:
   1. per-build agreement (the numbers you'd publish),
   2. head-to-head divergence (identical read-outs, same bucket, |Δstress|),
   3. **directional attenuation** — for each dimension, how often build B scores
-     LOWER than build A vs higher, and the same split restricted to the exam's
-     high-withdrawal turns. A one-sided split there is the finding.
+     LOWER than build A vs higher, and, for W only, the same split restricted to the
+     exam's high-withdrawal turns (teacher W >= 1.5; 40 of the 195 questions). A
+     one-sided split there is the finding.
 
 Usage (each build is an ollama tag you created from a different GGUF). The repo
 ships only server/Modelfile — copy it once per extra build and change only its
-FROM line. We publish no q6_k/q4_k_m GGUF of v7 or v9; quantize the weights yourself
+FROM line. We publish no q6_k/q4_k_m GGUF of v7, v9 or v10; quantize the weights yourself
 (llama.cpp: convert_hf_to_gguf.py to f16, then llama-quantize; see eval/README.md).
-Per-build agreement is graded against the exam's v9 labels by default; pass
---labels pre_v9 when comparing v7 builds.
+Per-build agreement is graded against the exam's v10 labels by default; pass
+--labels v9 when comparing v9 builds and --labels pre_v9 when comparing v7 builds.
 
     cp server/Modelfile Modelfile.q4                    # then edit FROM: ...q4_k_m.gguf
     ollama create hamo-q8  -f server/Modelfile          # FROM: the shipped q8_0 GGUF
@@ -61,6 +63,8 @@ BASELINE_STRESS = 5.0
 # A turn counts as crisis-adjacent when the teacher labelled withdrawal this
 # high. This is the subset where attenuation stops being cosmetic.
 HIGH_W = 1.5
+# label set -> key in synthetic_exam.jsonl (same mapping as run_exam.py)
+LABEL_KEYS = {"v10": "labels", "v9": "labels_v9", "pre_v9": "labels_pre_v9"}
 
 
 def run_build(model: str, base_url: str, exam: list, timeout: float) -> dict:
@@ -142,14 +146,14 @@ def main() -> None:
     ap.add_argument("--base-url", default="http://127.0.0.1:11434")
     ap.add_argument("--timeout", type=float, default=30.0)
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--labels", choices=["v9", "pre_v9"], default="v9",
-                    help="label set for per-build agreement: v9 (default) or pre_v9 (for v7 builds)")
+    ap.add_argument("--labels", choices=list(LABEL_KEYS), default="v10",
+                    help="label set for per-build agreement: v10 (default), v9 (for v9 builds) or pre_v9 (for v7 builds)")
     args = ap.parse_args()
 
     exam = [json.loads(l) for l in open(os.path.join(HERE, "synthetic_exam.jsonl"))]
     if args.limit:
         exam = exam[: args.limit]
-    gold = {q["id"]: q["labels" if args.labels == "v9" else "labels_pre_v9"] for q in exam}
+    gold = {q["id"]: q[LABEL_KEYS[args.labels]] for q in exam}
     print(f"Exam: {len(exam)} synthetic questions | builds: {', '.join(args.models)}")
 
     results = []

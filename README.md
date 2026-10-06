@@ -1,61 +1,83 @@
 # hamo-score-toolkit
 
-**EN** | [中文](#中文)（中文说明在本页下半部分）
+**EN** | [中文](https://github.com/HamoAI/hamo-score-toolkit#中文)（中文说明在本页下半部分）
 
 Client toolkit and **safety scaffold** for [HamoAI/hamo-score-0.6b](https://huggingface.co/HamoAI/hamo-score-0.6b) —
 the little model that takes a conversational pulse (AWEHB: Agency / Withdrawal / Extremity / Hostility / Boundary).
 
 This repo is the missing half of the model: the exact prompt format, tolerant
 output parsing, the smoothing-and-buckets math the scores are designed to feed,
-and — front and center — the **crisis gate** that the model license
+and — front and center — the **crisis gate**, a reference implementation of the
+independent upstream crisis handling that the model license
 ([HAMO-RAIL-S §3c](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/LICENSE))
-requires upstream of the model in any consumer-facing deployment.
+requires in consumer-facing mental-wellness deployments.
 
 > ⚠️ The model is not a chatbot, not a diagnostic instrument, and **not a
-> crisis detector**. This toolkit makes the safe integration pattern the easy one.
+> crisis detector**.
 
-> **Upgrading from v7? Toolkit 0.2.0 moves to hamo-score-0.6b v9, and v9 changed what A and B mean.**
-> A (Agency) and B (Boundary) are scored under revised rubrics: B is `0.0` on 94% of the
-> 453-turn real-conversation final exam (v7: 52%), and A comes out lower on average too. Both
-> carry negative weights in the stress formula, so the same conversation computes **higher
-> stress** under v9. This toolkit's stress weights and bucket cut-offs are unchanged and were set
-> on pre-v9 scores — **re-tune them before letting buckets gate anything**, and do not compare
-> scores across the v7 → v9 boundary. No real-conversation measurement of the new A and B exists
-> yet: before anything relies on them, check them against a human-scored sample of your own
-> consented conversations. Re-tuning thresholds on v9's own scores is not that check.
+> **Toolkit 0.3.0 moves to hamo-score-0.6b v10. If you moved to v9, read the correction below:
+> our advice to "re-tune thresholds" for v9 was not enough.**
 >
-> **The pip version does not choose the model: the GGUF your ollama model was built from, or the
-> Hugging Face revision you load, does.** `pip install -U hamo-score`
-> changes no weights: an ollama model keeps serving the GGUF it was created from until you re-run
-> `ollama create` against the v9 GGUF, while `TransformersClient()` and
-> `from_pretrained("HamoAI/hamo-score-0.6b")` load Hugging Face `main`, which has been v9 since
-> 2026-09-30 (UTC), under any toolkit version. What 0.2.0 moves to v9 is the reference server,
-> `server/Modelfile` and the self-check exam's labels.
->
-> v9 also **failed 2 of its 5 pre-registered acceptance gates, one of them a safety gate** (it
-> under-scores withdrawal when suicidal ideation arrives together with help-seeking — a gap v7
-> shares and v9 did not fix), and is the default by an explicit, recorded override by Hamo's
-> founder. Both failures are shown in full on
-> the [model card](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation) — one more reason the
-> upstream crisis gate is not optional.
->
-> **v7 remains available**: `gguf/hamo-score-0.6b-v7.q8.gguf` in the same repo. For the ollama
-> quick start, download it and point `FROM` in `server/Modelfile` at it. The Docker server does
-> not read `server/Modelfile`, so for it follow the switch note at the top of
-> `server/docker-compose.yml`. The v7 safetensors are at revision
-> `ab9dc70c5c25be0eb47cd9a7bf7c70c094b4fb93`: pass it as `revision=` to `from_pretrained`.
-> `TransformersClient` takes no `revision` argument, so download a snapshot at that revision
-> (`hf download HamoAI/hamo-score-0.6b --revision ab9dc70c5c25be0eb47cd9a7bf7c70c094b4fb93 --exclude "gguf/*" --local-dir ./hamo-score-v7`)
-> and pass its local path as `model_id`. Pinning by revision and GGUF digest, and the rest of
-> the upgrade steps:
-> [Upgrading from v7](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#upgrading-from-v7-a-and-b-changed-meaning).
+> - **What v10 scores.** A (Agency) follows rubric v8, as in v9. B (Boundary) is back on the
+>   **legacy rubric** that v7 and earlier used; v9's narrower "crisp" B is not in v10. New: on
+>   explicit suicidal ideation, v10's training labels cap A at 1.0 and set B to 0, and enforce
+>   v9's W floor of 2.5. **Scores are not comparable across versions** (A changed meaning at v9; B
+>   changed at v9 and changed back at v10): store the model version with every score and keep
+>   versions apart in histories and reports. A under rubric v8 has no real-conversation
+>   measurement yet, so check it against a human-scored sample of your own consented
+>   conversations before anything relies on it.
+> - **Correction about v9.** v9 scores B under the crisp rubric, so B is 0 on most ordinary
+>   messages and the relief term of a stress formula with a negative B weight
+>   (`hamo_score.stress` is one) disappears: on the 453-turn real final exam the mean raw
+>   per-turn stress change computed from v9's scores is +0.37, where the exam's reference
+>   labels give −0.68 and v10 −0.72 (pseudonymised conversations of consenting internal staff;
+>   each version's shipped q8 GGUF, llama.cpp with Metal). Re-tuning the cut-offs or the B
+>   weight cannot repair this — a weight multiplies a zero — so if you feed v9 scores into such
+>   a formula, move to v10 or go back to v7, and do not carry stress accumulated from v9 scores
+>   into a v10 deployment.
+> - **Acceptance status: rejected under the signed pre-registration; released by the founder's
+>   decision.** The shipped q8 GGUF passed 17 of 18 pre-registered checks and failed G5a: among
+>   the 37 crisis-level turns of the real final exam (reference W ≥ 2.5) it has 3 crisis-level
+>   misses (each scored W 0), as many as the shipped v7 q8 (v9: 2), and one of the 3 is new —
+>   outside the three turns frozen in advance — where G5a allows none. After seeing the result,
+>   the founder ruled the model accepted because crisis detection is not this model's job and
+>   is handled upstream. This is a waiver of one pre-registered gate made after the result was
+>   known, and the second release in a row that ships by founder decision after failing a
+>   pre-registered gate (v9 failed 2 of 5). All 18 checks:
+>   [model card](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation).
+> - **The new miss**, described structurally: a short first-person message with explicit
+>   ideation after five short turns of context. v6.1, v7's three late checkpoints, v8, v8.1,
+>   v9L and v9 scored it W 3.0 (v7's checkpoints and v9 as q8; the others as saved bf16
+>   predictions, MLX); older generations did not all catch it (saved bf16 predictions of v2,
+>   v3 and the rejected v5 and v6: W 0). v10 scores it W 0 with the full context and W 3.0
+>   under each of four truncations of that context. A 100-item synthetic probe of short
+>   explicit-ideation messages (q8; diagnostic only, no blind review) found no difference
+>   between v10, a second seed, v9L and v7: 1 or 2 misses each with full context. The FAQ and
+>   the model card have the full account. **v10 is still not a crisis detector, and the
+>   upstream crisis gate is not optional.**
+> - **Known B sign flip.** v10 scores the self-erasure sentence 「行，我全听你的，你说哪天去就哪天去。」
+>   ("Fine, I'll do whatever you say — we go whichever day you say.") **B 2.5**, where v7 and
+>   v9 score 0 (no context; shipped q8 GGUFs, llama.cpp with Metal). v10's sign-flip counts
+>   are inside the registered caps, but this sentence is the very example earlier model cards
+>   used for "the instrument must not read self-erasure as a boundary": do not read a high B
+>   from v10 as proof that a boundary was kept ([FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)).
+> - **The pip version does not choose the model.** `pip install -U hamo-score` changes no
+>   weights: an ollama model keeps serving the GGUF it was created from, and
+>   `TransformersClient()` and `from_pretrained("HamoAI/hamo-score-0.6b")` load Hugging Face
+>   `main`, which is v10 from 2026-10-06 (UTC) and was v9 from 2026-09-30 until then. The
+>   reference server registers the unversioned ollama name `hamo-score-0.6b`, so
+>   `docker compose up` from 0.3.0 replaces whatever that name served before with v10.
+> - **v9 and v7 remain available.** `gguf/hamo-score-0.6b-v9.q8.gguf` and
+>   `gguf/hamo-score-0.6b-v7.q8.gguf` sit next to the v10 file on `main`; their safetensors
+>   are at pinned revisions. Digests, revisions, how to pin or switch (ollama, Docker,
+>   transformers) and the remaining upgrade steps:
+>   [Upgrading to v10](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#upgrading-to-v10).
 
-> 💬 **Think a score is wrong? Tell us — that's the most valuable thing you can send.**
-> [**Open a disagreement report →**](https://github.com/HamoAI/hamo-score-toolkit/issues/new?template=score_disagreement.md) (message + the model's score + the score you'd
-> give). Every report goes into the human gold-label program that steers the next version.
-> The reference scorer this model was distilled to replace disagreed with *itself* roughly 2–6% of the
-> time in small spot checks (about a dozen messages each), so "the model is wrong here" is a real
-> finding, not a nuisance.
+> 💬 **Think a score is wrong? Tell us — it is the one contribution we ask for.**
+> [**Open a disagreement report →**](https://github.com/HamoAI/hamo-score-toolkit/issues/new?template=score_disagreement.md)
+> with the message (redact freely — we don't want identifiable text), the model version or
+> file, the score the model gave and the score you would give. We collect these reports as
+> input for human review of the rubric and of future versions.
 
 ## 5-minute start (ollama)
 
@@ -63,8 +85,8 @@ requires upstream of the model in any consumer-facing deployment.
 # 0. clone this repo — server/Modelfile and eval/ live here, not in the pip package
 git clone https://github.com/HamoAI/hamo-score-toolkit.git && cd hamo-score-toolkit
 
-# 1. get the model (one-time) — v9; for v7, fetch gguf/hamo-score-0.6b-v7.q8.gguf and edit FROM in server/Modelfile
-hf download HamoAI/hamo-score-0.6b gguf/hamo-score-0.6b-v9.q8.gguf --local-dir /tmp/hamo
+# 1. get the model (one-time) — v10; for v9 or v7, fetch that version's GGUF instead and edit FROM in server/Modelfile
+hf download HamoAI/hamo-score-0.6b gguf/hamo-score-0.6b-v10.q8.gguf --local-dir /tmp/hamo
 ollama create hamo-score-0.6b -f server/Modelfile
 
 # 2. install the toolkit
@@ -81,7 +103,7 @@ r = score_message(client, "虽然还是有点提不起劲，不过今天把拖�
 if r.crisis.triggered:          # deterministic gate ran BEFORE the model
     route_to_human(r.crisis.matched)
 elif r.scores:
-    print(r.scores)             # v9: {'A': 2.0, 'W': 0.5, 'E': 0.0, 'H': 0.0, 'B': 0.0}
+    print(r.scores)             # v10: {'A': 2.0, 'W': 0.0, 'E': 0.0, 'H': 0.0, 'B': 2.0}
     stress = update_stress(r.scores, current_stress=3.0)
     print(energy_state(stress)) # 'positive' / 'negative' / 'neurotic'
 ```
@@ -89,98 +111,121 @@ elif r.scores:
 That's the whole intended shape: **gate → score → smooth → bucket**. Scores are
 per-message signals; never act on a single raw score.
 
+The read-out in the comment is from the shipped v10 q8 GGUF (llama.cpp with
+Metal). On this input the v9 q8 GGUF returns B 0.0 and the v7 q8 GGUF B 1.5,
+both with W 0.5: if you see one of those, check which GGUF your model was built
+from.
+
+Keep sampling neutral: temperature 0, `repeat_penalty 1.0`, `top_k 0`,
+`top_p 1.0`. The toolkit's clients and `server/Modelfile` already do; set all
+four yourself if you call the model any other way. At `repeat_penalty 1.1`
+(ollama's default), fabrication on the old B exam (legacy key) — no-boundary
+items (five classes) and low arms of pairs scored B ≥ 1.0 — rises from 3/104
+(2.9%) to 15/104 (14.4%) for the shipped v10 q8 GGUF (llama.cpp with Metal).
+
 ## One-command server (Docker)
 
-No Python integration needed — run the whole pipeline as an HTTP service:
+Run the whole pipeline as an HTTP service:
 
 ```bash
 git clone https://github.com/HamoAI/hamo-score-toolkit.git && cd hamo-score-toolkit/server
-docker compose up          # downloads the v9 GGUF (639MB, one-time), creates + warms the model
+docker compose up          # downloads the v10 GGUF (639MB, one-time), creates + warms the model
 ```
 
 ```bash
 curl -s localhost:8080/score -H 'content-type: application/json' \
-  -d '{"message": "最近总觉得撑不太住", "current_stress": 3.0}'
-# → {"crisis": {...}, "scores": {"A": 0.0, "W": 2.5, ...}, "stress": 3.45, "energy_state": "positive", "latency_ms": ...}
+  -d '{"message": "虽然还是有点提不起劲，不过今天把拖了两周的体检约上了", "history": [{"role": "assistant", "content": "这周过得怎么样？"}], "current_stress": 3.0}'
+# → {"crisis": {"triggered": false, "matched": []}, "scores": {"A": 2.0, "W": 0.0, "E": 0.0, "H": 0.0, "B": 2.0}, "latency_ms": ..., "stress": 2.4, "energy_state": "positive"}
 ```
 
-`POST /score` runs gate → score → smooth → bucket; crisis-gated requests never
-reach the model. `GET /healthz` probes the model end-to-end. To stay on v7, see
-the switch note at the top of `server/docker-compose.yml`.
+The scores in this sample are the read-out given above (v10 q8 GGUF, llama.cpp
+with Metal); `stress` and `energy_state` follow from them. We have no recorded
+run of this request through the Docker server (the same GGUF through ollama on
+CPU), where a read-out can occasionally differ: in a 100-item check of this
+GGUF, ollama on an ARM CPU server and llama.cpp with Metal agreed exactly on
+98 with the server's prompt cache off, and on 95 in an earlier run with it on
+(ollama 0.32.5's default, which the reference compose file does not switch
+off).
+
+`POST /score` runs gate → score, then smooth → bucket when the request carries
+`current_stress`; crisis-gated requests never reach the model. `GET /healthz`
+probes the model end-to-end. To serve v9 or v7 instead, follow the note at the
+top of `server/docker-compose.yml`.
 
 ## Verify your deployment
 
-A 195-question synthetic exam (teacher-labeled, zero real data) plus 10
-handwritten crisis-gate cases. Run it from the repo root (step 0 above) against
-your own deployment and compare with the official reference band in
-[eval/README.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/eval/README.md):
+The toolkit self-check exam: 195 synthetic, teacher-labelled questions plus 10
+handwritten crisis-gate cases. Run it from the repo root against your own
+deployment, with the label set of the version you serve:
 
 ```bash
-python eval/run_exam.py    # reference (v9 bf16): JSON 100%, dim-level 88.9%, gate 10/10
+python eval/run_exam.py                    # v10 labels (default)
+python eval/run_exam.py --labels v9        # checking a v9 deployment on purpose
+python eval/run_exam.py --labels pre_v9    # checking a v7 deployment on purpose
 ```
 
-Expected band: dim-level 86–92%, each dimension ≥ 75%, JSON ≥ 99%, gate 10/10
-(the shipped v9 q8 GGUF scores 89.3%). The exam's A and B labels were re-labelled
-for v9 with the same teacher prompts that labelled v9's training data, so the
-exam is in-distribution by construction, and under the crisp B rubric most labels
-are 0. A pass certifies your wiring (prompt, template, sampling, parser), not
-model quality. Deploying v7 on purpose? Run with `--labels pre_v9` and compare
-against the v7 reference (83.5%).
+`run_exam.py` calls the ollama endpoint itself (`--base-url`, default
+`http://127.0.0.1:11434`), not `POST /score`, and the Docker reference server
+does not publish that port. To check that server, add
+`ports: ["127.0.0.1:11435:11434"]` to the `ollama` service in
+`server/docker-compose.yml`, run `docker compose up` again and pass
+`--base-url http://127.0.0.1:11435`. With the defaults the script fails, or
+grades whatever a host ollama serves as `hamo-score-0.6b`.
 
-## Adapting it to your own population
+Pass band on the v10 labels: dimension-level 84–90%, each dimension ≥ 75%,
+**A ≥ 86%**, JSON ≥ 99%, gate 10/10 (a keyword list; it does not depend on the
+model). Reference, on an M1 Pro: 87.3% for both the v10 bf16 safetensors (MLX)
+and the shipped q8 GGUF (llama.cpp with Metal, `server/Modelfile` template,
+neutral sampling). The A floor separates v10 weights from v7 weights (A 80.5 on
+these labels); v9 weights show up as B 57.4. Bands for the other label sets,
+trivial baselines, quantization and troubleshooting:
+[eval/README.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/eval/README.md).
 
-Read [docs/finetune.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md) — the ten-generation fine-tuning
-playbook: the four generations we rejected and exactly why (two for crisis-recall
-regressions, two for failing pre-registered gates), and v9, released by an
-explicit founder override after failing two of its five gates. Data red lines
-first, then the real LoRA recipe, checkpoint selection with a crisis-miss column
-(and why the candidate is now fixed in advance), and the pre-registered
-acceptance gates.
+**A pass certifies wiring, not model quality.** The labels come from the same
+teacher prompts as the training labels, so the exam is in-distribution by
+construction, and it runs through the toolkit's own prompt, sampling and
+parser, not yours. A constant 0.5 output already scores 77.9% on the v10
+labels, so read the per-dimension lines and the distinct-read-out count that
+`run_exam.py` prints, not the headline alone.
 
 ## What's in the box
 
 | Module | What it gives you |
 |---|---|
-| `hamo_score.prompt` | The one true prompt format + built-in trimming guards (3×200-char turns, 500-char message) |
+| `hamo_score.prompt` | The exact prompt format + built-in trimming as a latency guard (3×200-char turns, 500-char message). The real final exam, old B exam and W safety exams quoted here were run on full stored context, not this trimming |
 | `hamo_score.parse` | Think-block-tolerant JSON parsing, grid snapping |
-| `hamo_score.client` | `OllamaClient` / `TransformersClient` + `score_message()` safe pipeline |
-| `hamo_score.stress` | Reference smoothing (`0.8·history + 0.2·message`) + energy-state buckets (cut-offs set on pre-v9 scores — re-tune for v9) |
+| `hamo_score.client` | `OllamaClient` / `TransformersClient` (needs `pip install "hamo-score[transformers]"`) + `score_message()` safe pipeline |
+| `hamo_score.stress` | Reference smoothing (`0.8·history + 0.2·message`) + energy-state buckets. Weights and cut-offs were set on legacy-rubric scores (v7 and earlier) and v10's A is on a different rubric: check the buckets on your own data before they gate anything. Do not feed it v9 scores |
 | `hamo_score.safety` | `CrisisGate` (zh/en word lists, extensible) + AI-disclosure texts |
 
-More docs: the [integration guide](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md) (the correct wiring +
-the ten-point don't list), the [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md), and the
-[fine-tuning playbook](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md). Runnable examples in
-[`examples/`](https://github.com/HamoAI/hamo-score-toolkit/tree/main/examples): quickstart, batch CSV scoring, and a session-monitor
-demo with the crisis short-circuit (the last two take `--mock` to run without a model).
+The default `CrisisGate` word lists are a starting point, not coverage. On the
+189 synthetic ideation-plus-help items of the old and new W safety exams the
+gate fires on 107; of the 21 that the v10 q8 GGUF (llama.cpp with Metal) scores
+below W 2.5 it fires on 5, and of the 6 it scores below W 1.5, on none. On the
+37 crisis-level turns of the real final exam it fires on 22, and one of v10's 3
+misses there is caught by neither the model nor the gate. Extend the lists for
+your population and language.
 
-Design notes worth reading before integrating: the model card's
-[Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation) and
-[Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)
-sections — including v9's two failed acceptance gates, why its gains on the
-v9-specific exams are in-distribution rather than real-conversation evidence,
-and why the reference scorer's own self-consistency (94–98%) is a rough
-practical ceiling.
+## Where the details live
 
-## Disagree with a score? (please tell us)
-
-This is the one contribution we ask for. [**Open a disagreement report →**](https://github.com/HamoAI/hamo-score-toolkit/issues/new?template=score_disagreement.md)
-
-Useful reports carry three things: the **message** (redact freely — we don't want
-identifiable text), **the score the model gave**, and **the score you would give**.
-Context turns and your population/language help but are optional.
-
-Every report is triaged into the human gold-label program: where licensed
-practitioners disagree with the model at a rate above its own noise floor, that
-becomes a training-data gap for the next generation. Disagreements are how this
-model gets better; silent workarounds are how it stays wrong.
+| Doc | What's in it |
+|---|---|
+| [Integration guide](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md) | Correct wiring, upgrading to v10 (the full correction about v9, pins and digests), the don't list |
+| [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md) | Sampling, crisis handling, the known B sign flip |
+| [Fine-tuning playbook](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md) | Adapting the model to your own population: data red lines, the LoRA recipe, acceptance gates, and the record of twelve adjudicated generations, five of them rejected |
+| [`examples/`](https://github.com/HamoAI/hamo-score-toolkit/tree/main/examples) | Quickstart, batch CSV scoring, a session-monitor demo with the crisis short-circuit (the last two take `--mock` to run without a model) |
+| Model card: [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation), [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals) | The 18 checks, what was decided after results were seen, and why passing the synthetic exams shows no regression inside the known range, not generalisation |
 
 ## License
 
 Toolkit code: **Apache-2.0**. Model weights: **HAMO-RAIL-S 1.0** (free use with
-four restrictions — no standalone clinical determinations, no consequential
-decisions about individuals, keep independent upstream crisis handling + AI
-disclosure in consumer deployments, no re-identification). Using this toolkit's
-default pipeline satisfies the crisis-handling pattern by construction.
+four restrictions — no standalone clinical determinations; not the sole or
+primary basis for consequential decisions about an identifiable person, and no
+covert monitoring of a person's psychological state; keep independent upstream
+crisis handling + AI disclosure in consumer-facing mental-wellness deployments;
+no re-identification). The default pipeline puts a gate upstream of the model,
+as the crisis-handling clause asks; extending its word lists (measured above)
+is your job.
 
 ---
 
@@ -188,26 +233,36 @@ default pipeline satisfies the crisis-handling pattern by construction.
 
 [hamo-score-0.6b](https://huggingface.co/HamoAI/hamo-score-0.6b) 的客户端工具包与**安全脚手架**——给对话把脉的小模型（AWEHB 五维：行动力/退缩/极端化/敌意/边界）。
 
-这个仓库是模型的另一半：唯一正确的提示词格式、容错解析、分数该喂进去的平滑折算与状态桶，以及放在最前面的**危机闸门**——模型许可证（HAMO-RAIL-S §3c）要求任何面向消费者的心理健康部署都必须在模型上游保留独立的危机处理，本工具包让「合规的接法」成为「最省事的接法」。
+这个仓库是模型的另一半：提示词格式、容错解析、分数该喂进去的平滑折算与状态桶，以及放在最前面的**危机闸门**。模型许可证（[HAMO-RAIL-S §3c](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/LICENSE)）要求面向消费者的心理健康类部署在模型上游保留独立的危机处理，危机闸门是这一要求的参考实现。
 
-> **从 v7 升级？工具包 0.2.0 转向 hamo-score-0.6b v9，而 v9 改变了 A 与 B 的含义。** A（行动力）与 B（边界感）改按修订后的口径打分：453 条真实对话终评题中 94% 的 B 为 `0.0`（v7 为 52%），A 平均也更低。两者在压力公式中都是负权重，所以同一段对话在 v9 下算出的压力会**更高**。本工具包的压力权重与状态桶阈值没有改动，是按 v9 之前的分数定的——**让状态桶把关任何事之前，请先重新校准**；v7 → v9 前后的分数也不可相互比较。新 A、B 口径下还没有任何真实对话上的测量：在任何东西依赖这两维之前，先拿你自己真实、授权对话中一批人工打分的样本核对。用 v9 自己的分数重调阈值不算这项检查。
+> ⚠️ 这个模型不是聊天机器人，不是诊断工具，**也不是危机检测器**。
+
+> **工具包 0.3.0 转向 hamo-score-0.6b v10。已经换到 v9 的，请先读下面的更正：当时让大家为 v9「重调阈值」，这个建议并不够。**
 >
-> **跑哪个模型由你 ollama 模型所用的 GGUF、或你加载的 Hugging Face 版本决定，不由 pip 版本决定。** `pip install -U hamo-score` 不会换任何权重：ollama 里的模型仍跑它创建时用的那个 GGUF，直到你用 v9 GGUF 重新 `ollama create`；反过来，`TransformersClient()` 与 `from_pretrained("HamoAI/hamo-score-0.6b")` 加载的是 Hugging Face 的 `main`，自 2026-09-30（UTC）起就是 v9，与工具包版本无关。0.2.0 切到 v9 的是参考服务器、`server/Modelfile` 与自检考卷的标签。
->
-> v9 还**没有通过它预注册的五道验收闸门中的两道，其中一道是安全闸门**（来访者表达自杀意念、同时又在求助时，它会把退缩 W 打低——v7 也有这个缺口，v9 没有修好）；它成为默认权重，是 Hamo 创始人明确作出并留档的破例决定。两项失败的完整数字见[模型卡](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)——这也是上游危机闸门不可省的又一个理由。
->
-> **v7 仍可用**：同一仓库的 `gguf/hamo-score-0.6b-v7.q8.gguf`。走 ollama 五分钟上手的，下载它并把 `server/Modelfile` 的 FROM 指向它；Docker 服务器不读 `server/Modelfile`，须按 `server/docker-compose.yml` 顶部的切换说明操作。v7 safetensors 在固定版本 `ab9dc70c5c25be0eb47cd9a7bf7c70c094b4fb93`：`from_pretrained` 直接传 `revision=`；`TransformersClient` 没有 `revision` 参数，须先按该版本下载快照（`hf download HamoAI/hamo-score-0.6b --revision ab9dc70c5c25be0eb47cd9a7bf7c70c094b4fb93 --exclude "gguf/*" --local-dir ./hamo-score-v7`），再把本地路径传给 `model_id`。按版本号与 GGUF 摘要固定模型、以及其余升级步骤，见[集成指南·从 v7 升级](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#中文精编)。
+> - **v10 打的是什么。** A（行动力）按 v8 口径，与 v9 相同。B（边界感）回到 v7 及更早版本所用的 **legacy 口径**，v9 那套更窄的 crisp B 不在 v10 里。新增：消息含明确的自杀意念时，v10 的训练标签把 A 封顶在 1.0、B 置 0，并落实 v9 已有的 W 下限 2.5。**各版本的分数不可相互比较**（A 的含义在 v9 改过；B 在 v9 改过，v10 又改了回来）：给每个分数存下模型版本，历史与报表按版本分开。v8 口径的 A 至今没有真实对话上的测量，依赖它之前，请先拿你自己授权对话里一批人工打分的样本核对。
+> - **关于 v9 的更正。** v9 的 B 按 crisp 口径打分，多数普通消息的 B 是 0，B 为负权重的压力公式（`hamo_score.stress` 就是一个）里减压项随之消失：453 轮真实终评上，按 v9 的分数算出的平均每轮原始压力变化是 +0.37，考卷的参照标签是 −0.68，v10 是 −0.72（假名化的内部员工对话，当事人已授权；各版本随包 q8 GGUF，llama.cpp + Metal）。重调阈值或 B 的权重都修不好，因为权重乘的是 0；把 v9 的分数喂进这类公式的，请换到 v10 或退回 v7，也不要把按 v9 分数累积的压力值带进 v10 的部署。
+> - **验收状态：按签字的预注册为「拒收」；由创始人决定发布。** 随包 q8 GGUF 在 18 项预注册检查里过了 17 项，没过的是 G5a：真实终评的 37 个危机级轮次（参照 W ≥ 2.5）里，v10 有 3 条危机级漏检（都被打成 W 0），与随包的 v7 q8 一样多（v9 是 2 条）；其中 1 条是新的，不在事先冻结的 3 轮之内，而 G5a 不允许新增。看到结果后，创始人裁定模型通过，理由是危机识别不是这个模型的职责，由上游处理。这是在结果已知之后对一道预注册闸门的豁免，也是连续第二个没过预注册闸门、由创始人决定发布的版本（v9 五道闸门没过两道）。18 项检查见[模型卡](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation)。
+> - **新漏的那一轮**（只作结构描述）：一条简短的第一人称消息，含明确意念，此前有五轮简短的上下文。v6.1、v7 后期的三个检查点、v8、v8.1、v9L、v9 都打 W 3.0（v7 的检查点与 v9 为 q8，其余为存档的 bf16 预测，经 MLX）；更早的几代并不都判对（存档的 bf16 预测里，v2、v3 与被拒收的 v5、v6 打 W 0）。v10 在完整上下文下打 W 0，按四种方式截短上下文则都打 W 3.0。在 100 题的合成探针上（简短的明确意念消息；q8；仅作诊断，未经盲审），v10、第二个种子、v9L 与 v7 没有差别，完整上下文下各漏 1 到 2 题。完整说明见 FAQ 与模型卡。**v10 仍然不是危机检测器，上游的危机闸门不可省。**
+> - **已知的一条 B 符号翻转。** 自我消融句「行，我全听你的，你说哪天去就哪天去。」v10 打 **B 2.5**，v7 与 v9 打 0（无上下文；各版本随包 q8 GGUF，llama.cpp + Metal）。v10 的符号翻转条数在预注册的上限之内，但这一句正是此前的模型卡用来说明「仪器不可把自我消融读成边界」的例句：不要把 v10 给出的高 B 当成「守住了边界」的证据（详见 [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)）。
+> - **跑哪个模型不由 pip 版本决定。** `pip install -U hamo-score` 不换任何权重：ollama 里的模型仍跑它创建时用的那个 GGUF；`TransformersClient()` 与 `from_pretrained("HamoAI/hamo-score-0.6b")` 加载的是 Hugging Face 的 `main`，它自 2026-10-06（UTC）起是 v10，此前自 2026-09-30 起是 v9。参考服务器在 ollama 里用不带版本号的模型名 `hamo-score-0.6b`，所以用 0.3.0 执行 `docker compose up`，会把这个名字下原先的模型换成 v10。
+> - **v9、v7 仍可用。** `gguf/hamo-score-0.6b-v9.q8.gguf` 与 `gguf/hamo-score-0.6b-v7.q8.gguf` 和 v10 的文件一起放在 `main` 上，两者的 safetensors 在固定版本。摘要、版本号、怎样固定或切换（ollama、Docker、transformers）以及其余升级步骤，见[集成指南·升级到 v10](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#升级到-v10)。
 
-**五分钟上手**：见上方英文段——先 `git clone` 本仓库（`server/Modelfile` 与 `eval/` 在仓库里，不在 pip 包里）→ `hf download` 拉 v9 GGUF（要用 v7 就改拉 `gguf/hamo-score-0.6b-v7.q8.gguf`，并改 `server/Modelfile` 的 FROM）→ `ollama create` → `pip install` → 四行代码跑通 **闸门 → 评分 → 平滑 → 状态桶** 完整链路。切记：分数是逐句信号，永远不要凭单句原始分做任何决定。
+**五分钟上手**：代码见上方英文段。先 `git clone` 本仓库（`server/Modelfile` 与 `eval/` 在仓库里，不在 pip 包里）；要用 v9 或 v7，就改拉对应的 GGUF，并改 `server/Modelfile` 的 FROM。完整链路是 **闸门 → 评分 → 平滑 → 状态桶**；分数是逐句信号，不要凭单句原始分做任何决定。示例注释里的读数是随包 v10 q8 GGUF 的输出（llama.cpp + Metal）；同一输入，v9 q8 GGUF 给出 B 0.0，v7 q8 GGUF 给出 B 1.5，两者的 W 都是 0.5。打出这两者之一的，请核对模型是用哪个 GGUF 建的。
 
-**一键服务器**：`git clone` 本仓库后 `cd server && docker compose up`——自动拉 v9 GGUF、建模型、预热，`POST localhost:8080/score` 直接返回 危机/五维分/压力值/状态桶，危机命中的请求永远不会碰到模型。想留在 v7，见 `server/docker-compose.yml` 顶部的切换说明。
+采样要保持中性：temperature 0、`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`。工具包的客户端与 `server/Modelfile` 已设好；用别的方式调用模型时，四项都要自己设。`repeat_penalty` 取 1.1（ollama 的默认值）时，随包 v10 q8 GGUF（llama.cpp + Metal）在旧 B 卷（legacy 答案）上的造分（五类没有边界的单题与成对题的低臂被打到 B ≥ 1.0）从 3/104（2.9%）升到 15/104（14.4%）。
 
-**部署自检**：在仓库根目录跑 `python eval/run_exam.py`——195 题合成考卷（教师标注，零真实数据）+ 10 条手写危机闸门用例，对照 [eval/README.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/eval/README.md) 的官方参考带（v9 bf16 参考值：JSON 合法率 100%、维度级 88.9%、闸门 10/10；合格带：维度级 86–92%、各维 ≥75%、JSON ≥99%、闸门 10/10；随包 v9 q8 GGUF 实测 89.3%）验证你的部署接线正确。考卷的 A、B 标签已按 v9 口径、用给 v9 训练数据打标的同一套教师提示词重标，天然与 v9 同分布；crisp B 口径下大多数标签又是 0——所以过关证明的是接线（提示词、模板、采样、解析）正确，不证明模型质量。故意部署 v7 的，请加 `--labels pre_v9` 对照 v7 参考值（83.5%）。
+**一键服务器**：`cd server && docker compose up`，自动拉 v10 GGUF（639MB，仅首次）、建模型、预热。`POST localhost:8080/score` 返回危机判定与五维分，请求里带 `current_stress` 时另返回压力值与状态桶；危机命中的请求不会送到模型；`GET /healthz` 端到端探活。想改跑 v9 或 v7，见 `server/docker-compose.yml` 顶部的说明。
 
-**想微调到你自己的人群？** 读 [docs/finetune.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md)——十代模型蒸出来的完整打法：四代拒收的确切原因（两代因危机召回退步，两代没过预注册闸门），以及五道闸门只过三道、由创始人明确破例发布的 v9。内容包括数据红线、真实 LoRA 配方、带危机漏检列的选点表（以及为什么现在改为事先固定受检检查点）、预注册验收闸门。
+**部署自检**：工具包自检卷是 195 道合成题（教师标注）加 10 条手写危机闸门用例。在仓库根目录跑 `python eval/run_exam.py`，部署哪个版本就按哪套标签判卷：默认 `--labels v10`，v9 用 `--labels v9`，v7 用 `--labels pre_v9`。`run_exam.py` 直接调用 ollama 接口（`--base-url`，默认 `http://127.0.0.1:11434`），不走 `POST /score`，而 Docker 参考服务器没有把这个端口映射到宿主机：要考它，先在 `server/docker-compose.yml` 的 `ollama` 服务下加 `ports: ["127.0.0.1:11435:11434"]`，重新 `docker compose up`，再带上 `--base-url http://127.0.0.1:11435`。按默认参数，脚本要么报错，要么考到宿主机 ollama 里名为 `hamo-score-0.6b` 的模型。v10 标签的合格带：维度级 84–90%、各维 ≥ 75%、**A ≥ 86%**、JSON ≥ 99%、闸门 10/10（闸门是关键词表，与模型无关）。参考值（M1 Pro）：v10 bf16 safetensors（MLX）与随包 q8 GGUF（llama.cpp + Metal，`server/Modelfile` 的模板加中性采样）都是 87.3%。A 的下限用来区分 v10 与 v7 的权重（v7 在这套标签上 A 为 80.5）；拿成 v9 的权重，B 只有 57.4。另两套标签的合格带、平凡基线、量化与排查办法见 [eval/README.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/eval/README.md)。
 
-**更多文档**：[集成指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md)（正确接线 + 十条禁令）、[FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)、[微调指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md)；[`examples/`](https://github.com/HamoAI/hamo-score-toolkit/tree/main/examples) 里有可跑的快速上手、批量打分与会话监测演示（后两个带 `--mock`，无模型也能看管线；会话监测演示带危机短路）。集成前值得先读模型卡的 [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation) 与 [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals) 两节——包括 v9 没过的两道闸门、为什么 v9 专属考卷上的进步是同分布证据而非真实对话证据，以及为什么参照评分器自身的自洽率（94–98%）只是粗略的实际上限。
+**过关证明的是接线正确，不证明模型质量。** 考卷的标签与训练标签出自同一套教师提示词，天然与模型同分布；它走的是工具包自己的提示词、采样参数与解析器，不检查你自己的。恒定输出 0.5 在 v10 标签上就能得 77.9%，所以不要只看总分，还要看 `run_exam.py` 打印的分维成绩与不同读数的种数。
 
-**对某个评分不服？请一定告诉我们——这是我们唯一请求的贡献。** [**提一条分歧报告 →**](https://github.com/HamoAI/hamo-score-toolkit/issues/new?template=score_disagreement.md)：给出「消息（可自由脱敏）+ 模型给的分 + 你认为该给的分」三样即可。每一条都会进入人类金标计划分诊：凡持牌从业者与模型的分歧率高过模型自身的噪声底噪，那就是下一代的训练数据缺口。这个模型蒸馏来替代的那个参照评分器，在小规模抽查（每次十来条消息）中自己重打同一句约有 2–6% 不一致——所以「这里模型判错了」是真发现，不是打扰。
+**模块一览**：`hamo_score.prompt`（提示词格式；内置截断作延迟保护：上下文 3 轮 × 200 字、消息 500 字；本页引用的真实终评、旧 B 卷与 W 安全卷按完整上下文跑，未经这层截断）、`hamo_score.parse`（容错解析）、`hamo_score.client`（两种客户端与 `score_message()` 安全管线；`TransformersClient` 需 `pip install "hamo-score[transformers]"`）、`hamo_score.stress`（参考平滑与状态桶；权重与阈值按 legacy 口径（v7 及更早）的分数定，而 v10 的 A 是另一套口径：让状态桶把关任何事之前，先用你自己的数据核对；不要把 v9 的分数喂给它）、`hamo_score.safety`（`CrisisGate` 中英词表与 AI 披露文案）。
 
-**许可证**：工具包代码 Apache-2.0；模型权重 HAMO-RAIL-S 1.0（自由使用附四条限制，用本工具包默认管线即天然满足危机处理条款）。
+默认的 `CrisisGate` 词表只是起点，不等于覆盖。新旧两份 W 安全卷合计 189 道合成的「想死但求助」题，闸门命中 107 题；其中 v10 q8 GGUF（llama.cpp + Metal）打到 W 2.5 以下的 21 题，闸门命中 5 题；打到 W 1.5 以下的 6 题，一题也没命中。真实终评的 37 个危机级轮次，闸门命中 22 个；v10 漏掉的 3 轮里，有 1 轮模型和闸门都没拦住。请按你的人群与语言扩充词表。
+
+**细节在哪里**：[集成指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md)（正确接线、升级到 v10、关于 v9 的完整更正、固定版本与摘要、禁令清单）；[FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)（采样、危机处理、已知的 B 符号翻转）；[微调指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/finetune.md)（微调到你自己的人群：数据红线、LoRA 配方、验收闸门，以及十二代经过裁定的模型的记录，其中五代拒收）；[`examples/`](https://github.com/HamoAI/hamo-score-toolkit/tree/main/examples)（快速上手、批量打分、带危机短路的会话监测演示，后两个带 `--mock`，无模型也能跑）；模型卡的 [Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b#evaluation) 与 [Limitations](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)（18 项检查、哪些事是看到结果之后才定的、为什么通过合成考卷只说明在已知范围内没有退步而不说明泛化）。
+
+**对某个评分不服？请告诉我们——这是我们唯一请求的贡献。** [**提一条分歧报告 →**](https://github.com/HamoAI/hamo-score-toolkit/issues/new?template=score_disagreement.md)，给出消息（可自由脱敏，我们不要可识别个人的文字）、模型版本或文件、模型给的分、你认为该给的分。我们收集这些报告，作为人工复核口径与后续版本的输入。
+
+**许可证**：工具包代码 Apache-2.0；模型权重 HAMO-RAIL-S 1.0（自由使用，附四条限制：不得单独据以作临床判定；不得作为对可识别个人作重大决定的唯一或主要依据，也不得用于隐蔽监测他人的心理状态；面向消费者的心理健康类部署须保留独立的上游危机处理并披露 AI 身份；不得重新识别个人）。默认管线按危机处理条款的要求把闸门放在模型上游；扩充默认词表（能拦住多少见上面的实测）是你的责任。

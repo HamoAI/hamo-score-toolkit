@@ -1,4 +1,4 @@
-FROM /tmp/hamo/gguf/hamo-score-0.6b-v9.q8.gguf
+FROM /tmp/hamo/gguf/hamo-score-0.6b-v10.q8.gguf
 TEMPLATE """<|im_start|>user
 {{ .Prompt }}<|im_end|>
 <|im_start|>assistant
@@ -12,8 +12,10 @@ PARAMETER num_predict 80
 PARAMETER stop <|im_end|>
 # 必须显式中性化采样：ollama 默认 repeat_penalty=1.1 会惩罚重复 token，
 # 而本模型输出是 {"A": 0.0, "W": 0.0, ...} 这类高度重复结构——默认值会
-# 系统性把分数从 0 推高（v7 q8 实测造分率 2.9% → 8.7%；v6.1 为 13.5% → 25.0%；
-# v9 q8 在 crisp B 卷上 1.9% → 2.8%）。
+# 系统性把分数从 0 推高。v10 随包 q8 在旧 B 卷（legacy 答案）上（llama.cpp + Metal）：造分 2.9% → 14.4%
+# （3/104 → 15/104），符号翻转 2 → 4（93 题中）。此前各版本当时公布的数字方向相同，但测量场合不同，幅度不能互比：
+# v7、v6.1 各自的 q8 在旧 B 卷（legacy 答案）上（llama.cpp，CPU）造分 2.9% → 8.7%、13.5% → 25.0%；
+# v9 q8 在旧 B 卷（crisp 答案）上（见 v9 模型卡）造分 1.9% → 2.8%。
 PARAMETER repeat_penalty 1.0
 PARAMETER top_k 0
 PARAMETER top_p 1.0

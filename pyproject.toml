@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hamo-score"
-version = "0.2.0"
+version = "0.3.0"
 description = "Client toolkit and safety scaffold for the HamoAI/hamo-score-0.6b conversational pulse-taking model"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -21,7 +21,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-transformers = ["transformers>=4.51", "torch"]
+transformers = ["transformers>=4.51", "torch", "accelerate"]
 
 [project.urls]
 Model = "https://huggingface.co/HamoAI/hamo-score-0.6b"
