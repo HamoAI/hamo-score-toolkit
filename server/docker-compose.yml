@@ -16,6 +16,9 @@
 services:
   ollama:
     image: ollama/ollama:latest
+    environment:
+      # llama-server's prompt cache grows with every distinct prompt, up to 8 GiB by default. Off, memory stays flat.
+      LLAMA_ARG_CACHE_RAM: "0"
     volumes:
       - ollama-data:/root/.ollama
       - model-cache:/models
