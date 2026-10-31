@@ -27,6 +27,8 @@ services:
 
   setup:
     image: curlimages/curl:latest
+    # The image runs as the non-root curl_user, but the model-cache volume is root-owned: writing the GGUF needs root.
+    user: "0:0"
     depends_on:
       ollama:
         condition: service_healthy
