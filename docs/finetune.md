@@ -7,21 +7,33 @@ downloaded [HamoAI/hamo-score-0.6b](https://huggingface.co/HamoAI/hamo-score-0.6
 and want to adapt it — to a new language, a new population, a different
 register — using their own **consented** data.
 
-It is the distilled playbook of twelve adjudicated model generations. Five we
+It is the distilled playbook of fourteen adjudicated model generations. Six we
 **rejected** after training completed: v5 and v6 because, on high-withdrawal
 turns of the real set (turns whose reference W is 2.5 or more), W fell toward
 0 more often than for the incumbent, v4; v8, v8.1 and v9L on their
-pre-registered acceptance gates. Two
+pre-registered acceptance gates; v10r under v10's checks. Two
 more failed a pre-registered gate and were then **released by the founder's
-decision**, one after the other: v9 (3 of its 5 gates passed) and the current
+decision**, one after the other: v9 (3 of its 5 gates passed) and the previous
 release, v10. v10's status: **it met 17 of the 18 checks of its signed
 pre-registration; the one it did not meet, G5a, was a stand-in for crisis
 handling, which the founder ruled outside this model after seeing the result;
 under the registration as signed the verdict was "rejected", and v10 is
 released by the founder's decision, a waiver of one pre-registered gate made
-after the result was known.** The file that was judged is the file that
-ships. The model's technical record (linked from the model card) reports sixteen of the 18 checks (all sixteen passed)
-and quotes the ruling in part
+after the result was known.**
+
+The current release is v10h: v10's prompts and training recipe, with the
+answers on the synthetic training rows replaced by the scores from a review
+by human counselors engaged by Hamo (their names, number and credentials are
+not published). v10h's status: **its registration, frozen before training,
+asked one main question: is it closer to the counselor review than v10? On
+978 held-out synthetic items the answer is yes. It also carried over v10's 18
+checks and met 17. The one it did not meet, G5a, and G5b were stand-ins for
+crisis handling; the registration made both report-only, because the founder
+ruled crisis handling outside this model. The other 16 all passed.**
+
+For both v10 and v10h, the file that was judged is the file that ships. The
+model's technical record (linked from the model card) reports sixteen of the
+18 checks for each (all sixteen passed) and quotes v10's ruling in part
 ([Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)); §6
 and §8 say what failed each time and what we took from it. The rejections
 taught us more than the successes, so they are in here as rules. Everything
@@ -55,21 +67,41 @@ is code, not weights:
 | Disagree with scores on individual messages | Remember scores are per-message signals feeding a `0.8·history + 0.2·message` smoother — single-message noise is absorbed by design. If a *pattern* of disagreement persists, file it with the repo's score-disagreement issue template. We collect these reports as input for human review of the rubric and of future versions. |
 | Slightly different prompt/wording ideas | Don't. The model was trained on exactly one prompt frame ([`build_prompt`](../src/hamo_score/prompt.py)); added instructions and reordered or translated fields are out-of-distribution. |
 
-**Correction: "re-tune your thresholds" was not enough for v9.** The previous
+**Correction: "re-tune your thresholds" was not enough for v9.** The 0.2.0
 edition of this guide called upgrading to v9 "a re-tuning job"; that was
 wrong. v9's "crisp" B is 0 on most ordinary messages, so a formula that gives
 B a negative weight loses its relief term, and no re-tuning of the cut-offs
 or of the B weight restores it (a weight multiplies a zero): on our 453-turn
 real final exam the mean raw per-turn stress change computed from v9's scores
-is +0.37, where the reference labels give −0.68 and v10 gives −0.72 (shipped
-q8 GGUFs, llama.cpp with Metal). v9 is superseded as the default: move to v10
-or back to v7, do not carry over stress accumulated from v9 scores, and see
-the integration guide for the full correction, the pins and the rollback
-([Upgrading to v10](integration.md#upgrading-to-v10)). Lesson 13 in §8 is the
-rule.
+is +0.37, where the reference labels give −0.68, v10 gives −0.72 and v10h
+gives −0.63 (shipped q8 GGUFs, llama.cpp with Metal). v9 is superseded as the
+default: move to v10h or v10, or back to v7, do not carry over stress
+accumulated from v9 scores, and see
+the integration guide for the full correction
+([Upgrading to v10](integration.md#upgrading-to-v10)) and for the pins and the
+rollback ([Pins and rollback](integration.md#pins-and-rollback)). Lesson 13 in
+§8 is the rule.
 
-**What v10 changes for you.** From toolkit 0.3.0 the reference server serves
-v10 and the self-check exam grades against v10 labels by default (§7). A
+**What v10h changes for you.** Toolkit 0.4.0 serves v10h, whose synthetic
+labels were re-scored by human counselors engaged by Hamo; no change to the
+library's behaviour. The self-check exam keeps v10's label set, because there
+are no counselor labels for it (§7). Against v10, A and W read lower on
+average and all-zero outputs are fewer: on the real final exam mean A goes
+0.53 → 0.43 (reference labels 0.84), mean W 0.39 → 0.33 and all-zero outputs
+32.2% → 25.6% (shipped q8 GGUFs). Do not compare scores across the switch. A
+follows the review rather than the earlier rubric bands (§6). On v10h's
+synthetic rows nothing is applied on top of the review's scores: v10's
+explicit-ideation rule (below), the farewell rule and the W safety repair are
+not overlays there, and where the review differs from them, the review stands
+(counts in the
+[technical record](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#the-five-pulses-awehb)).
+The stress weights and cut-offs are unchanged. v10h passed the trajectory gate
+(G7, §6): mean raw per-turn stress change −0.63 (reference labels −0.68, v10
+−0.72), session-replay drift −0.14 (limit ±0.15). That does not validate the
+cut-offs for your population either.
+
+**What v10 changes for you.** Toolkit 0.3.0 moved the reference server to v10
+and the self-check exam to v10 labels by default (§7). A
 keeps rubric v8, as in v9: not comparable with v7's A, and lower (mean A on
 the real final exam 0.53 for v10, 0.68 for v7; shipped q8 GGUFs). B is back
 on the legacy rubric v7 used; do not compare it with v9's B. New in v10's
@@ -107,7 +139,8 @@ be released at all.
 synthetic except, since v6.1, 440 real conversation turns from three
 company-internal staff members (the founder and two staff counselors) with
 their explicit consent, upsampled ×3 (~8% of the v6.1 corpus; 1,310 of v10's
-20,787 training rows, 6.3%). External client/user conversations **never**
+20,787 training rows, 6.3%; the same 1,310 of v10h's 20,001, 6.5%). External
+client/user conversations **never**
 enter training, by construction. Adopt the same construction: real client
 data may serve as *exam* material (held-out evaluation, where your governance
 and local law permit), and enters *training* only with explicit, documented,
@@ -176,11 +209,15 @@ an error analysis of v3.x on that set shaped v4's training cells. v10's verdict 
 time a generation was judged on it (v6, v6.1, v7, v8, v8.1, v9, v9L, v10; the
 registration counted it as the seventh), not counting reference checkpoints,
 an ablation, the rehearsal, the second seed and re-measurements also scored
-there. The 305-turn split (the sealed real exam), unused
+there. v10r and v10h were judged on it after that: ten generations in all,
+and by the registrations' count v10h's judgement is its ninth use. The
+305-turn split (the sealed real exam), unused
 since v7, was reserved by v10's registration for a single later use, with two
-criteria written beforehand; it was used once, on 2026-10-05, on the v10 q8.
+criteria written beforehand; it was used on 2026-10-05 on the v10 q8, and had a
+report-only run on v10r on 2026-10-29.
 The criterion on W+E+H agreement was met; the other was of the same kind as
-checks G5a and G5b and, per the founder's ruling, is not reported (§6). If
+checks G5a and G5b and, per the founder's ruling, is not reported (§6).
+v10h's registration did not use this split. If
 your calibration set later enters training
 (ours did, in v6.1, under R1 consent), carve a fresh selection split out of
 held-out territory first; a set you train on can no longer select
@@ -237,6 +274,8 @@ detector like a teacher, against a bar written before the run. Ours failed one o
 first run; the fault was in the answer key (two rows corrected, one dropped),
 and the unchanged detector then met the bar. That is an answer key changed
 after seeing a result, and we disclose it as one (detail in the technical record).
+On v10h's synthetic rows the rule is not applied: their labels are the
+review's scores (§1).
 
 **Measure your incumbent's self-consistency.** In two spot checks of 12
 messages each (August 2026) the reference scorer reproduced its own dimension
@@ -258,14 +297,14 @@ Training rows are chat-format JSONL, one per line, as consumed by `mlx-lm`:
 ```json
 {"messages": [
   {"role": "user", "content": "给来访者最新消息打分（AWEHB，0.0-3.0）。\n此前对话:\nassistant: 这周过得怎么样？\n最新消息: 今天试着出门散了个步"},
-  {"role": "assistant", "content": "{\"A\": 1.0, \"W\": 0.0, \"E\": 0.0, \"H\": 0.0, \"B\": 1.5}"}
+  {"role": "assistant", "content": "{\"A\": 1.0, \"W\": 0.0, \"E\": 0.0, \"H\": 0.0, \"B\": 1.0}"}
 ]}
 ```
 
-(The scores shown are the released v10's own read-out on this prompt — q8
+(The scores shown are the released v10h's own read-out on this prompt — q8
 GGUF and bf16 safetensors agree — standing in for a teacher label. On the
-same prompt v9 reads B 0.0, and v7 reads A 2.5 and B 2.0 (both as q8):
-scores do not compare across these versions.)
+same prompt v10 reads B 1.5, v9 reads B 0.0, and v7 reads A 2.5 and B 2.0
+(all as q8): scores do not compare across these versions.)
 
 Build the user content with `hamo_score.build_prompt` so the train-time
 prompt and the serve-time prompt are **byte-identical**. Any drift between
@@ -364,8 +403,9 @@ the model actually sees them, and keep them out of every eval split.
 
 ## 5. The LoRA recipe
 
-This is the actual config that trained the released v10 weights (`mlx-lm`,
-one M1 Pro MacBook, 16GB). The hyperparameters are those of the v6.1, v7 and
+This is the actual config that trained the released v10h weights (`mlx-lm`,
+one M1 Pro MacBook, 16GB); v10's file differs from it only in the data and
+adapter paths. The hyperparameters are those of the v6.1, v7 and
 v9 runs; against v9's file only the data path, the adapter path and `seed`
 differ — 1 for the registered candidate run, 2 for a report-only second run
 (v9 used 0). Paths adapted, numbers untouched:
@@ -389,7 +429,7 @@ max_seq_length: 1024
 steps_per_report: 400
 steps_per_eval: 1200
 save_every: 1200
-seed: 1                          # v10's candidate run; its report-only second run used 2
+seed: 1                          # the candidate run of v10 and v10h; their report-only second runs used 2
 ```
 
 ```bash
@@ -427,12 +467,13 @@ stops and restarts any run whose train loss exceeds 1.0 after iteration 400;
 it caught v9's first attempt. Close memory-hungry apps, or train overnight. Neither v10 run diverged, although both ran in the daytime,
 started right after the registration was signed and not at the 22:00 it had
 scheduled — a deviation from the registration. Two clean daytime runs do not
-retire the advice.
+retire the advice. And the watchdog has a blind spot: it did not see the
+collapse at the end of v10h's second seed (§8, lesson 18).
 
 `save_every: 1200` yields six checkpoints — your selection pool for §6; or,
 if you fix the candidate in advance (as we did for v9), spares you can score
-later as robustness evidence; or, as for v10, the ingredients of an averaged
-candidate (the last three).
+later as robustness evidence; or, as for v10 and v10h, the ingredients of an
+averaged candidate (the last three).
 
 Rough wall-clock: a full 7,200-iteration run takes about two hours on an M1
 Pro with 16GB (v9 over 20,187 train rows; each of v10's two runs over 20,787
@@ -504,8 +545,8 @@ The selection table has four columns, and every one earned its place:
    after both checkpoints had been scored on the final split, where they tied
    (decision 97.1% each), so for v7 the final was touched more than once.
    v10's registration still carried the count as G5a; the founder set that
-   gate aside after the result was known (2026-10; below), and the next
-   registration will not gate on it.
+   gate aside after the result was known (2026-10; below), and v10h's
+   registration made it report-only.
 4. **Distinct output vectors** — the collapse detector. One early generation
    scored decently while emitting only **59** distinct five-score
    combinations against 233 in the reference labels of the 758-turn set: it
@@ -535,7 +576,9 @@ average been worse than the worst of its three ingredients, the rule would
 have been "last checkpoint". And the judged artifact is the shipped one: the
 gates ran on the q8 GGUF through llama.cpp, where earlier generations were
 gated on the bf16 adapter through MLX; the published bf16 safetensors holds
-the same averaged weights. §7 has the build steps.
+the same averaged weights. §7 has the build steps. v10h's registration kept
+this rule: the same three iterations of its own seed 1 run, the same
+conversion, nothing selected by exam score.
 
 **The acceptance hard gate.** Through v7, the winning checkpoint sat the
 final exam — the split reserved for the shipping decision (v7 excepted, see
@@ -606,12 +649,40 @@ handling is not judged by this model or by its W score — it is done in the
 spine, the deterministic code around the model — and that v10 passes: a
 waiver of one pre-registered gate made after the result was known. Following
 that ruling, neither this guide, nor the model card, nor its technical record reports G5a and G5b, and
-the next registration will not gate on G5a. The judged file was not swapped,
+v10h's registration made both report-only. The judged file was not swapped,
 and a second seed's average that met all 18 checks stayed report-only and
 was not used. This is the second
 release in a row to ship by the founder's decision after failing a
 pre-registered gate (v9 failed 2 of 5). The technical record quotes the ruling in
 part.
+
+**v10h: one main question, then v10's checks.** v10h's registration, frozen
+before training, asked one main question: is it closer to the counselor review
+than v10? The measure was total absolute error over the five dimensions on
+978 synthetic rows set aside from the review before training (§8, lesson 16).
+"Yes" needed three things, and all three held: the candidate's error is lower
+(1,249.0 → 695.5); the group-paired bootstrap 95% interval on that difference
+is above 0 ([501.0, 604.0]); the second seed is also lower than v10's second
+seed (by 497.0, interval [447.0, 548.5]). The registration also carried over
+v10's 18 checks with their pass lines, judged once on the candidate's q8 GGUF.
+v10h met 17. The one it did not meet, G5a, and G5b were stand-ins for crisis
+handling; the registration made both report-only, because the founder ruled
+crisis handling outside this model. The other 16 all passed, so under its own
+registration v10h passed. The second seed is report-only and cannot replace
+the candidate; it fell one judgment short on G6a (1,198 against the line of
+1,199) and passed the other 15 checks the technical record shows.
+
+Read that result with its limits. It is a result on synthetic messages: real
+conversations have no counselor scores. On the real final exam, against the
+reference labels, v10h ties v10 (dimension-level 82.8% against 82.4%,
+decision-level 440/453 against 435/453), with most differences inside seed
+noise. And the checks did not see the largest cost: G1 looks only at
+direction, while on the A exam scores inside the earlier rubric bands fell
+from 590 to 519 of 632. After seeing these results the founder decided that
+v10h may be published and that, where the review disagrees with earlier rubric
+bands or with the rule overlays, the review stands. The technical record has
+the reference lines, the costs and the decisions taken after the results
+([Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)).
 
 **A known B sign flip.** v10 scores 「行，我全听你的，你说哪天去就哪天去。」
 ("Fine, I'll do whatever you say — we go whichever day you say.") as B 2.5,
@@ -622,7 +693,10 @@ G2b 4/438, cap 17), the latter far below v7's count on that pool (47/438,
 q8).
 But it is the sentence the v7 model card used (printed there without the
 final full stop) for "the instrument must not read self-erasure as a
-boundary" (full account in the [FAQ](faq.md); lesson 15 in §8).
+boundary" (full account in the [FAQ](faq.md); lesson 15 in §8). v10h scores
+the sentence B 0 with no context (q8, MLX bf16 and transformers bf16 agree),
+and both its seeds score the old exam's longer form B 0. Flips remain on other
+items: G2a 0/93, G2b 4/438, G2c 4/596, inside the same caps.
 
 If you run against live traffic, do it in **shadow** first: new model scores
 in parallel, incumbent still decides, every pair logged. Preregister the
@@ -642,7 +716,7 @@ a registration.
 ## 7. Ship it
 
 Two routes, depending on how §6 fixed your candidate: a single checkpoint
-(every generation of ours through v9L) or an average of several (v10).
+(every generation of ours through v9L) or an average of several (v10, v10h).
 
 **A single checkpoint.** Fuse the **winning checkpoint** (not the training
 dir!), convert to GGUF, quantize to q8. One trap first:
@@ -669,11 +743,12 @@ python llama.cpp/convert_hf_to_gguf.py fused/my-score-model \
   --outfile my-score-model.q8.gguf --outtype q8_0
 ```
 
-**An averaged candidate (how v10 was built).** The order of operations is the
-whole point:
+**An averaged candidate (how v10 and v10h were built).** The order of
+operations is the whole point:
 
 1. Materialize and fuse **each** ingredient checkpoint on its own (steps 0
-   and 1 above; v10: iterations 4,800, 6,000 and 7,200 of the candidate run).
+   and 1 above; v10 and v10h: iterations 4,800, 6,000 and 7,200 of the
+   candidate run).
 2. Average the three full sets of weights tensor by tensor in float32 and
    cast to bf16 once, at the end. **Never average the LoRA factors**: a LoRA
    update is a product of two matrices, and the mean of the products is not
@@ -683,12 +758,12 @@ whole point:
    equal the mean of the ingredients.
 4. Convert the averaged directory to q8_0 (step 2 above) with a pinned
    llama.cpp revision. That GGUF is the candidate.
-5. Run a sanity check that can only demote. Ours (G0) ran on the 249-row
-   validation split, which is not an exam: no JSON failure, q8 close to bf16,
+5. Run a sanity check that can only demote. Ours (G0) ran on the validation
+   split (249 rows for v10, 244 for v10h), which is not an exam: no JSON failure, q8 close to bf16,
    and agreement, W on the rows labelled W ≥ 2.5 and gold-0 B no worse than
    the worst ingredient plus a small allowance written beforehand. Failing would have
    demoted the candidate to the last checkpoint; nothing could be promoted.
-   v10's average met all five conditions.
+   v10's average met all five conditions, and so did v10h's.
 
 ```python
 import os
@@ -711,14 +786,14 @@ def average_fused(fused_dirs, out_dir):
 Expect an average that sits among its ingredients, not above them: averaging
 takes the extremes off, it does not hand you the best checkpoint's zero, and
 it is not a safety net (§8, lesson 11). If you re-convert published weights,
-compare outputs or tensors, not hashes: re-converting our own build directory
-with the pinned converter gives the shipped GGUF byte for byte, but a
-conversion from a downloaded copy of the repository has the same 310 tensors
+compare outputs or tensors, not hashes. On v10, re-converting our own build
+directory with the pinned converter gave the shipped GGUF byte for byte, while
+a conversion from a downloaded copy of the repository had the same 310 tensors
 and different header metadata.
 
-Stay at **q8_0**: it is the only quantization of v10 we have measured, and it
-is the file v10's gates judged. Below q8, measure before you trust it: the
-lower-bit accuracy figures we have are from v7 weights (there, Q4_K_M pulled
+Stay at **q8_0**: it is the only quantization of v10 and v10h we have
+measured, and it is the file their checks judged. Below q8, measure before
+you trust it: the lower-bit accuracy figures we have are from v7 weights (there, Q4_K_M pulled
 W down one-sidedly on the turns with the highest reference W while bucket
 agreement barely moved; table in [`eval/README.md`](../eval/README.md)). Run
 [`eval/compare_quants.py`](../eval/compare_quants.py) against your q8 build
@@ -779,7 +854,10 @@ the [FAQ](faq.md)); and the serving check specified in the draft protocol
 (138 synthetic items of the old exams, with the toolkit's trimming; run on
 2026-10-05, two days after the verdict) reproduced Metal's sign-flip and
 W-floor counts. We make no
-cross-runtime claim beyond these; v10's gates ran on Metal.
+cross-runtime claim beyond these; v10's gates ran on Metal. So did v10h's
+checks. On that server v10h reproduced the sign-flip and W-floor counts of
+Metal on the same 138 items, and matched llama.cpp on 96 of 100 synthetic
+items exactly (all 100 within ±0.5).
 
 **Then take the exam.** The toolkit ships a deployment self-check — 195
 synthetic teacher-labeled questions plus 10 handwritten crisis-gate cases:
@@ -789,18 +867,24 @@ python eval/run_exam.py --model my-score-model
 ```
 
 Compare against the reference band in [`eval/README.md`](../eval/README.md).
-For the v10 label set, the default: JSON validity ≥ 99%, dimension-level
-84–90% with each dimension ≥ 75% and A ≥ 86%, gate **10/10 — hard
-requirement**. The shipped v10 q8 scores 87.3% (llama.cpp with Metal,
-`server/Modelfile` template, neutral sampling). Four notes for fine-tuners:
+For v10h on the default labels: JSON validity ≥ 99%, dimension-level
+84–90% with each dimension ≥ 75% and A ≥ 81, gate **10/10 — hard
+requirement**. The shipped v10h q8 scores 86.7% (llama.cpp with Metal,
+`server/Modelfile` template, neutral sampling; bf16 through MLX 86.8%). A v10
+deployment keeps v10's band on the same labels: the same lines with A ≥ 86
+(shipped v10 q8 87.3%). Four notes for fine-tuners:
 
-- **Three label sets, one per rubric combination**: `--labels v10` (the
-  default; A under rubric v8, legacy B), `--labels v9` (rubric-v8 A, crisp B)
+- **Three label sets, one per rubric combination**: v10's labels (A under
+  rubric v8, legacy B), the default, which `--labels v10h` and `--labels v10`
+  both name, because there are no counselor labels for this exam;
+  `--labels v9` (rubric-v8 A, crisp B)
   and `--labels pre_v9` (old A, legacy B). Grade a v9 or v7 deployment
-  against its own set (bands in `eval/README.md`). The A floor is what tells
-  v10 weights from v7 weights (A about 80 on the v10 labels).
+  against its own set (bands in `eval/README.md`). The A floor sits above v7
+  weights (A 80.5 on the v10 labels), but the script prints whole percents (v7
+  shows `A81%`), so also check the dimension-level number and B
+  (`eval/README.md`).
 - **The exam is in-distribution by construction, so it certifies wiring, not
-  model quality.** Its labels come from the same teacher prompts as the
+  model quality.** Its labels come from the same teacher prompts as v10's
   training labels. And it uses the toolkit's own prompt builder and parser
   and pins the sampling options on every request, which overrides the
   Modelfile: it cannot catch a Modelfile that omits `repeat_penalty 1.0`, nor
@@ -830,12 +914,13 @@ requirement**. The shipped v10 q8 scores 87.3% (llama.cpp with Metal,
 
 ---
 
-## 8. What v8 through v10 taught us
+## 8. What v8 through v10h taught us
 
 v8 and v9 were the first generations that changed the rubric itself — what
 A and B mean — rather than only the data under a fixed rubric. v9L changed B
 back, and v10 changed how a generation is judged. Lessons 9–15 are what v9L
-and v10 added.
+and v10 added. v10h changed where the synthetic labels come from; lessons
+16–18 are what it added.
 
 1. **Rubric changes are human rulings first, prompt second.** The founder
    ruled on A over four rounds. The teacher prompt carrying the first three
@@ -851,8 +936,10 @@ and v10 added.
    from the 61) and two more things of the kind from v9: 20 rows whose A was
    set to 0 on Claude reviewers' judgement of a farewell signal, and 50 rows
    removed from the corpus after Claude review. No new training label in v10
-   came from Claude. Do yours blind: the human scores first, with no model
-   score in view.
+   came from Claude. In v10h the 61 are out: those A values went back to the
+   open-weight teacher's scores. The 19 founder corrections stay, the 50 rows
+   stay out, and the 20 farewell rows now carry the review's scores. Do yours
+   blind: the human scores first, with no model score in view.
 2. **Re-label only the column that changed, and measure spill-over.** v8
    re-labelled only the A column; in v9, on the 18,162 prompts carried over
    from v7, each change (A, B, the W repair) touched a single column and
@@ -924,7 +1011,7 @@ and v10 added.
    the same count as v7 (shipped q8 GGUFs). Keep at least one
    real-conversation measurement per rubric, and remember that repeated
    attempts against one exam are a slow form of selection: the real final
-   exam has now judged eight generations on this model line (§3).
+   exam has now judged ten generations on this model line (§3).
 8. **If you override a gate, publish it. We have now done it twice, in
    consecutive releases.** v9 failed two of its five pre-registered gates:
    v9's gate 4 by one item (H 93.6 against a 93.8 floor on the real final),
@@ -991,7 +1078,7 @@ and v10 added.
     founder had ruled twice before (at v7's checkpoint choice and around v9's
     release) that crisis is handled upstream, not by this model. It ended in
     a waiver made after the result, the worst moment to learn that a gate is
-    not one; our next registration will not gate on G5a. Ask the person who
+    not one; v10h's registration made G5a report-only. Ask the person who
     can waive each gate: if this is the only line that fails, do we reject?
 15. **A rate cap protects no particular sentence.** v10 passed G2a and G2b
     with a flip on a longer form of §6's sentence counted (the old B exam
@@ -1001,9 +1088,59 @@ and v10 added.
     the very
     sentence v7's shipped checkpoint was chosen for reading correctly. That
     sentence is therefore not evidence
-    that v10 scores self-erasure as B 0. Keep the sentences that matter to
+    that v10 scores self-erasure as B 0. v10h shows the other side: it reads
+    that sentence B 0 and still has 4 flips on the 438-item pool, on other
+    items. Keep the sentences that matter to
     you as a named list, report each read-out beside the rate, and decide
     before training whether any is a hard line.
+16. **When labels come from a human review, freeze a grouped holdout from
+    that review before training, and measure absolute error.** Only the
+    review's own rows can tell you whether a model moved closer to it. We set
+    aside 978 of them before training, whole groups at a time (849 groups:
+    rows of one contrast pair or one conversation stay together). A ±0.5
+    agreement cannot see half-step changes, and 71% of the 35,065 cells the
+    review changed moved by half a step, so the measure was absolute error.
+    On those 978 rows the mean is 0.2554 for v10 and 0.1422 for v10h, 44%
+    lower (±0.5 agreement 88.6% and 96.0%). Read it against reference lines
+    written down beforehand: a constant 0.5 reads 0.6393, the earlier labels
+    0.2409, a generator-class
+    mean table 0.2204. Those are not a floor: a lookup on earlier score, class
+    and position in the sheet, which needs no model and cannot be used on a
+    new message, ties v10h. And holdout and training rows share one generator
+    and one review, so this shows closeness to that review on synthetic
+    messages, not better scoring of real ones.
+17. **Check a review for drift along its row order before training on it, and
+    have part of it double-reviewed.** Our review was done in batches, and it
+    is not one scale. Row order has nothing to do with content, yet W and E
+    start to move at about row 11,000 of 19,704, B changes almost as a step
+    at about row 13,800, and A and H do not move. With one cut at about row
+    13,700, the mean change from the earlier score, before the cut and after
+    it, is W −0.185 and −0.036, E −0.112 and +0.119, B −0.023 and −0.158. The
+    data cannot tell why, and v10h
+    learned a blend: split at row 14,000, its signed bias is W +0.03, E +0.04,
+    B −0.08 on the early stretch and W −0.14, E −0.21, B +0.05 on the late
+    one. A double review is the step that could have caught this; the
+    reviewers recommended one before retraining, and we trained without it.
+    Plot each dimension's mean change against row order first, and have a
+    second reviewer score a sample from across the sheet, blind to the first.
+    The review's provenance and limits are in the technical record
+    ([How it was trained](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#how-it-was-trained)).
+18. **Check the validation loss of the last checkpoint.** A train-loss
+    watchdog averaged over 400 steps (§5) cannot see a collapse at the end of
+    training. The last checkpoint of v10h's second seed collapsed that way,
+    at a time of memory pressure on the training machine: validation loss
+    0.686 against about 0.07, confirmed by a full re-measure, with no NaN or
+    Inf in the weights. The candidate comes from seed 1 and was not affected,
+    and the registration's third condition was met with the second seed all
+    the same, but its average contains that checkpoint, which makes it a less
+    clean yardstick for noise. Seed 2 was then retrained outside the
+    registration as a diagnostic, same config and seed, not on the real
+    exams: the last checkpoint was normal (validation loss 0.068), the
+    holdout error was 0.1457 against 0.1475 for the damaged seed and 0.1422
+    for the candidate, and the gap to the candidate is inside seed noise. It
+    changes no verdict and cannot replace the candidate. Measure the
+    validation loss of every checkpoint before it enters a candidate or a
+    report.
 
 ---
 
@@ -1042,7 +1179,7 @@ and stay inside the four use restrictions — then you are square.
 
 ---
 
-## Appendix: twelve generations at a glance
+## Appendix: fourteen generations at a glance
 
 **v2–v5** — bf16 adapter through MLX; real-turn numbers on the full 758-turn
 set. In the tables below, a "high-withdrawal turn" is a turn whose reference W
@@ -1069,40 +1206,46 @@ the cell.
 | v9 (released by founder decision; superseded by v10) | A rubric v8 + crisp B (whole B column re-labelled) + W safety repair (285 rows raised); same config as v7, 20,187 train rows; candidate fixed in advance (7,200); five gates incl. a new W safety exam | **released by the founder's decision** after passing 3 of 5 gates — failed v9's gate 4 (H one item short) and v9's gate 5, the old W safety exam (78.9% vs ≥ 95%). Real final (old-rubric labels): W/E/H 88.1/86.1/93.6, decision 96.0%. Its crisp B does not fit a formula with a negative B weight (§1) |
 | v9L | v9's corpus with the B column alone returned to legacy-rubric labels (20,187 train rows); same config; candidate fixed in advance (7,200); six gates, one of them new, on the stress trajectory | **rejected** — passed 4 of 6 gates: paired direction on the old B exam 56/60 (58 required), H on the real final exam 422/453 (floor 425); the trajectory gate passed. Taught us that our pass lines sat inside training noise |
 
-**v10** — judged q8 GGUF through llama.cpp with Metal; real final exam (453
-turns).
+**v10, v10r, v10h** — judged q8 GGUF through llama.cpp with Metal; real final
+exam (453 turns), against the reference labels, not counselor scores.
 
 | Generation | What changed | Outcome |
 |---|---|---|
-| v10 (released by founder decision) | v9L's corpus + the explicit-ideation rule (detector + deterministic code; labels changed on 179 training rows) + two minimal-pair patches of 150 pairs each; 20,787 train rows; same config, seeds 1 and 2; candidate fixed by rule: the average of seed 1's fused checkpoints at 4,800 / 6,000 / 7,200, judged as q8; 18 checks with noise allowances and rate caps | **verdict under the signed pre-registration: rejected** — it met 17 of the 18 checks; the one it did not meet, G5a, was a stand-in for crisis handling, which the founder ruled outside this model after seeing the result. **Released by the founder's decision**, a waiver of that gate made after the result was known (§6). Real final exam: W/E/H 87.4/85.2/93.2, B 74.2, decision 96.0% |
+| v10 (released by founder decision; superseded by v10h) | v9L's corpus + the explicit-ideation rule (detector + deterministic code; labels changed on 179 training rows) + two minimal-pair patches of 150 pairs each; 20,787 train rows; same config, seeds 1 and 2; candidate fixed by rule: the average of seed 1's fused checkpoints at 4,800 / 6,000 / 7,200, judged as q8; 18 checks with noise allowances and rate caps | **verdict under the signed pre-registration: rejected** — it met 17 of the 18 checks; the one it did not meet, G5a, was a stand-in for crisis handling, which the founder ruled outside this model after seeing the result. **Released by the founder's decision**, a waiver of that gate made after the result was known (§6). Real final exam: W/E/H 87.4/85.2/93.2, B 74.2, decision 96.0% |
+| v10r | v10's corpus re-labelled by a newer teacher | **rejected** under v10's checks — failed 3 of the 16 reported (G2a, G6d, G7); never released |
+| v10h (current release) | v10's prompts and recipe, with the answers on the 18,691 synthetic training rows replaced by the scores from a review by human counselors engaged by Hamo, and no rule overlays on them; the 1,310 real rows keep v10's labels, except that the 61 A values that were Claude pre-scores went back to the open-weight teacher's scores; 978 rows of the review held out; 20,001 train rows; same config, seeds 1 and 2; candidate by v10's rule, judged as q8 | **passed under its own registration** — closer to the review than v10 on 978 held-out synthetic items (mean absolute error 0.2554 → 0.1422); it met 17 of v10's 18 checks; the one it did not meet, G5a, and G5b were stand-ins for crisis handling, report-only under its registration because the founder ruled crisis handling outside this model; the other 16 all passed (§6). Real final exam: W/E/H 87.2/84.8/95.1, B 76.6, decision 97.1% |
 
 The 453-turn final is a split of the 758-turn set (v4 on the split: dim
 84.6%, decision 95.6%). Rows up to v9L report the numbers
-each generation was judged on at the time; v10's row is the judged q8, so do
+each generation was judged on at the time; the rows from v10 on are the
+judged q8, so do
 not read a few tenths of a point across that line as a difference between
 models. The dimension averages of
-v9 and v10 against old-rubric labels are left out on purpose: on A (and for
+v9, v10 and v10h against old-rubric labels are left out on purpose: on A (and for
 v9 on B) they measure how far the rubric moved, not accuracy. The A gains of
 v9 and v10, v9's crisp-B gains and v10's gains on self-erasure and on
 ideation-plus-help were measured on in-distribution synthetic exams (§8,
-lesson 7).
+lesson 7). v10h's gain against the review was measured on synthetic rows from
+the same generator and the same review (§8, lesson 16).
 
-Those twelve adjudicated generations sit on top of a good many more training
-runs (pilots, restarts, two runs that diverged mid-way, an ablation, v10's
-second seed, one run on a larger student that was dropped). You will train
+Those fourteen adjudicated generations sit on top of a good many more training
+runs (pilots, restarts, two runs that diverged mid-way, an ablation, second
+seeds, a diagnostic retrain of v10h's second seed, one run on a larger student
+that was dropped). You will train
 more often than you will ship.
 
 The pattern worth copying is not any single number. It is that each
 generation was judged on real held-out turns kept out of training and, from
-v6 on, against a gate written down before its own results existed. Five
+v6 on, against a gate written down before its own results existed. Six
 rejections are not a failure statistic — they are evidence the process works.
-The last two releases are the open overrides of an acceptance gate (v4, v6.1
+v9 and v10 are the open overrides of an acceptance gate (v4, v6.1
 and v7's checkpoint choice were judgment calls, §6), and we will not dress
 them up: v9 failed two of
 its five gates, one of them on the W safety exam; v10 did not meet one of its
 18 checks, G5a, a stand-in for crisis handling, and its verdict under the
 registration as signed was "rejected". Both were released by the
-founder's decision. A gate that can be waived is only as strong as the
+founder's decision. v10h is not a third: its registration made G5a and G5b
+report-only before training. A gate that can be waived is only as strong as the
 disclosure that follows, so each failure is stated where acceptance is stated
 and the thresholds were not moved after the fact. If you override your own
 gate, or find — as we did with "re-tune your thresholds" — that your own
@@ -1116,15 +1259,24 @@ guidance was wrong, publish it the same way.
 
 你从 HuggingFace 下载了
 [hamo-score-0.6b](https://huggingface.co/HamoAI/hamo-score-0.6b)，想用**经
-授权的**自有数据把它适配到你的人群、语域或语言。本文是十二代定谳模型蒸馏出的
-操作手册（中文为精编，细节以英文版为准）：五代训练完成后被**拒收**（v5、v6 因
+授权的**自有数据把它适配到你的人群、语域或语言。本文是十四代经过裁定的模型蒸馏出的
+操作手册（中文为精编，细节以英文版为准）：六代训练完成后被**拒收**（v5、v6 因
 在真实数据的高退缩轮次——即参照 W ≥ 2.5 的轮次——上把 W 打到接近 0 的次数多于当时的现任 v4，v8、v8.1、v9L 未过
-预注册验收闸门）；另有两代没过预注册闸门、之后
-**由创始人决定发布**，连续两次：v9（五道闸门过三道）和当前的 v10。v10 的状态：
+预注册验收闸门，v10r 未过 v10 的检查）；另有两代没过预注册闸门、之后
+**由创始人决定发布**，连续两次：v9（五道闸门过三道）和上一版 v10。v10 的状态：
 **签字版预注册的 18 项检查过了 17 项；没过的那一项 G5a 当初是作为危机处理的替代
 指标设的，创始人看到结果后裁定危机处理不在本模型里判定；按签字的预注册，判定是
-「拒收」，v10 由创始人决定发布——这是看到结果之后对一道预注册闸门的豁免**。受检的
-文件就是发布的文件。模型的技术档案（模型卡里有链接）报告 18 项中的 16 项（16 项全过），并节录了裁定原话
+「拒收」，v10 由创始人决定发布——这是看到结果之后对一道预注册闸门的豁免**。
+
+当前发布版是 v10h：沿用 v10 的提示词和训练配方，合成训练行的答案换成
+Hamo 请的真人咨询师的复核分（他们的姓名、人数和资质不公开）。v10h 的状态：**它的预注册
+在训练前冻结，主要问题是：它是否比 v10 更接近咨询师的复核？在 978 道留出的合成
+题上，答案是肯定的。预注册还沿用了 v10 的 18 项检查，v10h 过了 17 项。没过的是 G5a；
+G5a 和 G5b 都是危机处理的替代指标，创始人裁定危机处理不归本模型，预注册因此把这两项
+定为只报告。其余 16 项全过**。
+
+v10 和 v10h 发布的都是受检的那个文件。模型的技术档案（模型卡里有链接）对两者各
+报告 18 项中的 16 项（16 项全过），并节录了 v10 的裁定原话
 （[Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)）。全部经验
 来自一台 MacBook 加 API 打标，不是集群规模的流程。除另有说明外，v2–v9L 的成绩
 出自 bf16 adapter 经 MLX、温度 0（各代当时受判的口径）；标 q8 的是 GGUF 经
@@ -1142,15 +1294,28 @@ llama.cpp + Metal。先立框架：它是**测量仪器**——
 分数要经 `0.8·历史 + 0.2·本句` 平滑，单句噪声会被吸收，成规律的分歧走仓库的
 「评分分歧」issue 模板——我们收集这些报告，供人工复核口径与后续版本时参考。
 
-**更正：对 v9，「重调阈值」并不够。** 本指南上一版说「升级到 v9 本身就是一次
+**更正：对 v9，「重调阈值」并不够。** 本指南 0.2.0 版说「升级到 v9 本身就是一次
 重调」，这是错的。v9 的 crisp B 在普通消息上多半是 0，B 为负权重的公式因此失去
 减压项，重调阈值或 B 的权重都补不回来（权重乘的是 0）：453 轮真实终评上，按 v9
-的分数算出的平均每轮原始压力变化是 +0.37，参照标签是 −0.68，v10 是 −0.72（随包
-q8 GGUF，llama.cpp + Metal）。v9 不再是默认版本：请换 v10 或退回 v7，按 v9 分数
-累积的压力值不要带过去；完整更正、固定版本与回退见集成指南
-[「升级到 v10」](integration.md#升级到-v10)，由此得出的规则是§八第 13 条。
+的分数算出的平均每轮原始压力变化是 +0.37，参照标签是 −0.68，v10 是 −0.72，v10h
+是 −0.63（随包 q8 GGUF，llama.cpp + Metal）。v9 不再是默认版本：请换 v10h 或 v10，
+或退回 v7，按 v9 分数累积的压力值不要带过去；完整更正见集成指南
+[「升级到 v10」](integration.md#升级到-v10)，固定版本与回退见
+[「固定版本与回退」](integration.md#固定版本与回退)，由此得出的规则是§八第 13 条。
 
-**升级到 v10 会改变什么。** 工具包自 0.3.0 起，参考服务端提供 v10，自检卷默认按
+**升级到 v10h 会改变什么。** 工具包 0.4.0 提供 v10h，它的合成标签由
+Hamo 请的真人咨询师重新打分；库的行为没有变化。自检卷沿用 v10 的标签，因为这份考卷
+没有咨询师标签（见§七）。与 v10 相比，A、W 的平均读数更低，全零输出更少：真实终评上
+平均 A 0.53 → 0.43（参照标签 0.84）、平均 W 0.39 → 0.33、全零 32.2% → 25.6%（随包 q8）。
+不要跨这次切换比较分数。A 跟随复核，不再跟随此前的口径分数带（见§六）。v10h 的合成
+行上，复核分之外不再叠加任何东西：v10 的明确意念规则（见下）、告别规则和 W 安全修复
+在这些行上都不再叠加，复核与它们不同时以复核为准（计数见
+[技术档案](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#the-five-pulses-awehb)）。
+压力权重与分桶阈值未改动。v10h 通过了轨迹闸门（G7，见§六）：平均每轮原始压力变化
+−0.63（参照标签 −0.68，v10 −0.72），会话回放漂移 −0.14（界限 ±0.15）；这同样不等于
+替你的人群验证了阈值。
+
+**升级到 v10 会改变什么。** 工具包 0.3.0 把参考服务端换成 v10，自检卷默认改按
 v10 标签判。A 沿用口径 v8（同 v9），与 v7 的 A 不可比，读数也更低（真实终评平均
 A：v10 0.53、v7 0.68；随包 q8）。B 回到 v7 所用的 legacy 口径，不要与 v9 的 B
 比较。训练标签新增一条规则：消息含明确自杀意念时，A 封顶 1.0、B 为 0、W 至少
@@ -1169,7 +1334,8 @@ A：v10 0.53、v7 0.68；随包 q8）。B 回到 v7 所用的 legacy 口径，�
 
 - **R1 知情同意**：我们的训练语料是合成数据，唯一例外是 v6.1 起加入的 440 条
   真实对话轮次——来自三位公司内部员工（创始人与两位咨询师）、经本人明示授权、
-  ×3 上采样（v10 的 20,787 条训练行中为 1,310 行，6.3%）；**外部来访者对话从不
+  ×3 上采样（v10 的 20,787 条训练行中为 1,310 行，6.3%；v10h 的 20,001 条中是同样
+  这 1,310 行，6.5%）；**外部来访者对话从不
   入训，构造上保证**。照此执行：真实来访数据可做考卷（当地法规与治理允许时），
   入训必须有书面、可撤回的本人授权。「已脱敏」不等于授权。
 - **R2 标签工件筛查**：v6 拒收的教训。被上游闸门短路的消息，评分器并没有真正
@@ -1200,9 +1366,11 @@ v7、v8.1 的平均与原料打过分，G6、G7 的线也是照早先检查点�
 上面的成绩定的。更早，切分之前 v2–v5 在包含这 453 条的 758 条整卷上打过分，对
 v3.x 在整卷上的错误分析还用于设计 v4 的训练格子。v10 的判定是第八次有一代模型在它上面受判（v6、v6.1、v7、v8、
 v8.1、v9、v9L、v10；注册里算作第七次），参照检查点、消融、彩排、第二个种子和复测
-还不算在内。305 条那份（封存的真实考卷）自 v7 之后没有再用过，v10 的注册把它留作
-日后只用一次、两条准则事先写定；2026-10-05 在 v10 的 q8 上用了这一次：W+E+H
-一致率那一条满足；另一条与 G5a、G5b 同类，按创始人的裁决不报告（见§六）。每行
+还不算在内。此后 v10r、v10h 也在它上面受判，共十代；按注册的算法，v10h 的判定是它的
+第九次使用。305 条那份（封存的真实考卷）自 v7 之后没有再用过，v10 的注册把它留作
+日后只用一次、两条准则事先写定；2026-10-05 用在 v10 的 q8 上（2026-10-29 又给 v10r 跑过一次，只作报告）：W+E+H
+一致率那一条满足；另一条与 G5a、G5b 同类，按创始人的裁决不报告（见§六）。v10h 的
+注册没有用这份考卷。每行
 连同消息、上下文、金标一起，**记录当时的压力值等决策上下文**——否则算不了决策级。
 
 教师资格考：给训练数据打标的模型（我们用 deepseek-chat + 生产量表，temperature
@@ -1226,7 +1394,8 @@ temperature 0 打出的标签，v10 新补丁的行按同一口径新打。
 条，改动了 179 条训练行的标签。检测器偏宽；这条规则只会压低 A、清零 B、抬高 W。
 检测器也要先过资格考、合格线在出分前写定：我们的第一次考四条线有一条没过，复核
 发现错在答案（更正 2 行、剔除 1 行），检测器未改动，随后达标。**这是看过结果之后
-改答案**，我们照此披露（细节见技术档案）。
+改答案**，我们照此披露（细节见技术档案）。v10h 的合成行不再叠加这条规则：它们的
+标签就是复核分（见§一）。
 
 再量一下现任评分器的自洽：2026 年 8 月的两次抽查（各 12 条消息）里，参照评分器
 对自己的维度判断在 ±0.5 内复现的比例是 95% 和 98%——只是粗略的实际上限。若另建
@@ -1241,9 +1410,9 @@ mlx-lm 聊天格式 JSONL，user 内容**必须**用 `hamo_score.build_prompt` �
 500 字）：这是工具包的延迟护栏，不是我们的模型训练时见到的样子——v10 训练行里有
 36.6% 的上下文超过 3 轮。
 
-示例行见[英文版 §4](#4-training-data-format)：其中的分数是发布版 v10 在那条提示
-上的实际读数，充当教师标签；同一条提示，v9 读出 B 0.0，v7 读出 A 2.5、B 2.0（均为
-q8）——分数不能跨这几个版本比较。
+示例行见[英文版 §4](#4-training-data-format)：其中的分数是发布版 v10h 在那条提示
+上的实际读数，充当教师标签；同一条提示，v10 读出 B 1.5，v9 读出 B 0.0，v7 读出
+A 2.5、B 2.0（均为 q8）——分数不能跨这几个版本比较。
 
 合成教材按场景格子组织，配**准入闸门**（教师标签落在格子设计带内才收，否则
 弃样）。**v5 铁律：凡文本与痛苦相邻的格子，准入禁设 W 上限**——v5 的「有界
@@ -1266,7 +1435,8 @@ q8）——分数不能跨这几个版本比较。
 
 ### 五、LoRA 配方（MLX，一台 MacBook）
 
-发布版 v10 的真实配置（一台 M1 Pro MacBook，16GB）。超参与 v6.1、v7、v9 完全
+发布版 v10h 的真实配置（一台 M1 Pro MacBook，16GB）；v10 的配置文件与它只差数据
+路径和 adapter 路径。超参与 v6.1、v7、v9 完全
 相同；与 v9 的配置文件相比只有数据路径、adapter 路径与 `seed` 不同——预注册的
 候选那一轮用 1，只作报告的第二轮用 2（v9 用 0）。路径改成你的，数字别动：base
 `mlx-community/Qwen3-0.6B-bf16`，LoRA rank 8 / scale 20 / 16 层，
@@ -1282,9 +1452,10 @@ seq 1024 配 batch 8 会顶到 16.6GB 并**无声数值爆炸**（loss 0.118→1
 尝试都发散了，之前都先出现变慢和内存交换。自 v8.1 起训练在 `caffeinate` 下跑，
 并配发散监测：第 400 步后训练 loss 超过 1.0 即停止、从头重练。关掉吃内存的程序，
 或者夜里跑。v10 的两轮都没有发散，却是白天跑的：签字后立即开训，而注册里写的是
-22:00 开始——这是对注册的一处偏离；两次白天顺利跑完，不等于这条建议可以作废。
+22:00 开始——这是对注册的一处偏离；两次白天顺利跑完，不等于这条建议可以作废。这个
+监测还有盲区：它没看见 v10h 第二个种子在训练末尾的崩溃（见§八第 18 条）。
 `save_every: 1200` 产出六个检查点：选点池，或预先定死候选时的稳健性证据，或（如
-v10）平均候选的原料。一轮约 2 小时（v9 的 20,187 条训练行；v10 的 20,787 条两轮
+v10、v10h）平均候选的原料。一轮约 2 小时（v9 的 20,187 条训练行；v10 的 20,787 条两轮
 每轮相近；M1 Pro 16GB）。valid 切分只用来盯训练是否发散，**不**用来选点；v10
 多给了它一个用途：对平均候选做一次只能降级、不能挑选的健全性检查（见§七）。
 
@@ -1304,7 +1475,7 @@ W≥2.5 的轮次里有多少条预测 <0.5——总体一致率会掩盖 W 在�
 约束解除后，我们推翻了这一选择，改发边界符号
 翻转（把自我消融、金标 B=0 的发言打成高 B）为 0 的第 7,200 步；这次推翻是在两者都
 已考过终局集之后做出的。v10 的注册仍把这个数写成 G5a；创始人在看到结果之后
-（2026-10）把这道闸门搁置了（见下），下一份注册不再拿它设闸。
+（2026-10）把这道闸门搁置了（见下），v10h 的注册把它定为只报告。
 
 **或者在训练前就定死候选。** 选点本身就是噪声源：v8.1 预注册的选点规则（验证集
 一致率最高）以 0.4 个点之差选中第 4,800 步——它没过两道闸门，而第 7,200 步本可
@@ -1317,7 +1488,8 @@ W≥2.5 的轮次里有多少条预测 <0.5——总体一致率会掩盖 W 在�
 检查点、不挑种子、不挑平均。规则在训练前用两轮不可能成为候选的旧训练（v7、
 v8.1）彩排过：平均若比三个原料里最差的那个还差，规则就定为「最后一个检查点」。
 判什么，就发什么：闸门在 q8 GGUF 上经 llama.cpp 跑（此前各代是在 bf16 adapter 上
-经 MLX 判的），发布的 bf16 safetensors 是同一份平均权重。
+经 MLX 判的），发布的 bf16 safetensors 是同一份平均权重。v10h 的注册沿用这条规则：
+它自己种子 1 那一轮的同样三步、同样的转换，不按考卷成绩挑任何东西。
 
 终局硬闸（沿用至 v7）：**决策级 ≥ 现任，且高退缩轮次上 W 被打到 0.5 以下的次数
 不多于现任**，任一不过整代拒收、现任留任。第二条是 v5 拒收（758 题全卷的高退缩
@@ -1352,16 +1524,37 @@ v8.1）彩排过：平均若比三个原料里最差的那个还差，规则就�
 预注册，判定是「拒收」。看到结果之后，创始人裁定：危机处理不由这个模型判定，也
 不由它的 W 分数判定，而是在脊柱（模型外围的确定性代码）里做；v10 通过——这是
 看到结果之后对一道预注册闸门的豁免。依这项裁决，本指南、模型卡及其技术档案都不报告 G5a、
-G5b，下一份注册也不再拿 G5a 设闸。受检的文件没有更换；第二个种子的平均 18 项
+G5b，v10h 的注册把这两项定为只报告。受检的文件没有更换；第二个种子的平均 18 项
 全过，但它只作报告，没有采用。这是连续第二次在没过预注册闸门的情况下由创始人
 决定发布（v9 是五道没过两道）。裁定原话的节录见技术档案。
+
+**v10h：一个主要问题，再加 v10 的检查。** v10h 的注册在训练前冻结，主要问题是：
+它是否比 v10 更接近咨询师的复核？量的是训练前从复核里留出的 978 行合成题上
+五维绝对误差的合计（见§八第 16 条）。判「是」要同时满足三条，三条都满足：候选的误差
+更低（1,249.0 → 695.5）；按组配对的自助法（bootstrap）的 95% 区间高于 0（[501.0, 604.0]）；第二个
+种子也低于 v10 的第二个种子（低 497.0，区间 [447.0, 548.5]）。注册还沿用了 v10 的
+18 项检查及其通过线，在候选的 q8 GGUF 上只判一次。v10h 过了 17 项。没过的是 G5a；
+G5a 和 G5b 都是危机处理的替代指标，创始人裁定危机处理不归本模型，注册因此把这两项
+定为只报告。其余 16 项全过，所以按它自己的注册，v10h 通过。第二个种子只作报告，不能
+替换候选；它在 G6a 上差 1 个判断（1,198，通过线 1,199），技术档案列出的其余 15 项
+都过了。
+
+这个结果要连同它的边界一起读。它是合成消息上的结果：真实对话没有咨询师分数。真实
+终评上，对参照标签，v10h 与 v10 打平（维度级 82.8% 对 82.4%，决策级 440/453 对
+435/453），差别大多在种子噪声内。检查也没有看见最大的代价：G1 只看方向，而 A 考卷上
+落在此前口径分数带内的题从 590 降到 519（共 632）。看到这些结果之后，创始人决定
+v10h 可以发布，并决定复核与此前的口径分数带或叠加规则不一致时以复核为准。参照线、
+代价和结果出来之后才定的事，见技术档案
+[Evaluation](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)。
 
 **已知的一条 B 符号翻转。** v10 把「行，我全听你的，你说哪天去就哪天去。」打成
 B 2.5，v7 与 v9 打 0（q8，llama.cpp + Metal，无上下文）。旧 B 卷里有它的加长版本
 （句末多一句「…，你安排吧。」），v10 同样打 B 2.5——这是计入注册上限的翻转之一
 （G2a 2/93，上限 3；G2b 4/438，上限 17），在后一个题池上远低于 v7（47/438，q8）。但
 v7 的模型卡正是用这句话（当时印的不带句号）说明「仪器不得把自我消融读成边界」
-（完整说明见 [FAQ](faq.md)；教训见§八第 15 条）。
+（完整说明见 [FAQ](faq.md)；教训见§八第 15 条）。v10h 把这句话打成 B 0（无上下文；
+q8、MLX bf16、transformers bf16 读数相同），两个种子也都把旧卷的加长版本打成 B 0。
+其他题上仍有翻转：G2a 0/93、G2b 4/438、G2c 4/596，都在同样的上限内。
 
 接真实流量先跑**影子模式**（新模型并行打分、现任说了算、每一对都记录），切换
 标准预注册（例如：影子 ≥1 周、回退率 <2%、决策级 ≥96%、平滑压力轨迹偏差
@@ -1380,19 +1573,20 @@ v7 的模型卡正是用这句话（当时印的不带句号）说明「仪器�
 目录，再 `python -m mlx_lm fuse` 融合、用 llama.cpp 的
 `convert_hf_to_gguf.py --outtype q8_0` 转 GGUF。
 
-**平均候选（v10 的做法）。** 先后顺序是关键：① 每个原料检查点**各自**物化、
+**平均候选（v10、v10h 的做法）。** 先后顺序是关键：① 每个原料检查点**各自**物化、
 各自融合；② 对几份完整权重逐张量取 float32 平均，最后一次性转回 bf16——**绝不
 分别平均 LoRA 的两个因子**，乘积的平均不等于平均的乘积；③ 看任何成绩之前先核对
 构建（张量列表一致、没有非有限值、读回几张张量确实等于原料的平均）；④ 用固定
 版本的 llama.cpp 转成 q8_0，这个 GGUF 就是候选；⑤ 跑一次只能降级的健全性检查。
-我们的 G0 在 249 行验证集上跑（验证集不是考卷）：没有 JSON 失败，q8 与 bf16
+我们的 G0 在验证集上跑（v10 249 行，v10h 244 行；验证集不是考卷）：没有 JSON 失败，q8 与 bf16
 接近，一致率、标签 W ≥ 2.5 的行上的 W、金标 B = 0 的行都不比最差的原料差（留事先写定的小余量）；
-不过就把候选降为最后一个检查点，它不能把任何东西提上来。v10 的平均五个条件全过。
+不过就把候选降为最后一个检查点，它不能把任何东西提上来。v10 的平均五个条件全过，
+v10h 的也是。
 平均落在原料之间，不会更高，也不是保险。自己重新转换已发布权重时，比输出或
-张量，不要比哈希：重转我们自己的构建目录能逐字节复现发布的 GGUF，而从下载的仓库
-副本转换，310 张张量相同，文件头元数据不同。
+张量，不要比哈希。这项核对做在 v10 上：重转我们自己的构建目录能逐字节复现发布的
+GGUF，而从下载的仓库副本转换，310 张张量相同，文件头元数据不同。
 
-**量化档位。** 就用 q8：它是 v10 唯一测过的量化档位，也是 v10 的闸门所判的文件。
+**量化档位。** 就用 q8：它是 v10、v10h 唯一测过的量化档位，也是它们的检查所判的文件。
 更低位宽先实测再信：我们手头的低位宽准确率数据来自 v7 权重（在那里 Q4_K_M 让
 参照 W 最高的那些轮次的 W 单向偏低，分桶一致率却几乎不动；表格见
 [`eval/README.md`](../eval/README.md)）。先跑
@@ -1414,17 +1608,22 @@ v7 的模型卡正是用这句话（当时印的不带句号）说明「仪器�
 （关掉服务端提示词缓存后测得；此前开着缓存——ollama 0.32.5 的默认设置——跑的一次
 是 95 道和 98 道，见 [FAQ](faq.md)）；方案草案写定的服务端核对（138 道旧考卷的合成题，按
 工具包规则截短；2026-10-05 才跑，在判定两天之后）复现了 Metal 上的符号翻转数与
-W 达标数。此外不作跨运行环境的声明；v10 的闸门是在 Metal 上跑的。
+W 达标数。此外不作跨运行环境的声明；v10 的闸门是在 Metal 上跑的。v10h 的检查也在
+Metal 上跑；在那台服务器上，它在同样 138 道题上复现了 Metal 的符号翻转数与 W 达标数，
+另抽的 100 道合成题里 96 道与 llama.cpp 完全相同，100 道都在 ±0.5 内。
 
 **最后交卷**：`python eval/run_exam.py --model 你的模型`，对照 `eval/README.md`
-的参考带。默认按 v10 标签判：JSON ≥ 99%、维度级 84–90%、各维 ≥ 75% 且 A ≥ 86%、
-**闸门 10/10 硬性**；随包 v10 q8 为 87.3%（llama.cpp + Metal，`server/Modelfile`
-模板，中性采样）。
+的参考带。默认标签上 v10h 的带：JSON ≥ 99%、维度级 84–90%、各维 ≥ 75% 且 A ≥ 81、
+**闸门 10/10 硬性**；随包 v10h q8 为 86.7%（llama.cpp + Metal，`server/Modelfile`
+模板，中性采样；bf16 经 MLX 为 86.8%）。v10 的部署在同一套标签上沿用 v10 的带：其余
+相同，A ≥ 86（随包 v10 q8 为 87.3%）。
 
-- **三套标签**：`--labels v10`（默认；A 口径 v8、legacy B）、`--labels v9`（A
+- **三套标签**：v10 的标签（A 口径 v8、legacy B）是默认，`--labels v10h` 和
+  `--labels v10` 指的都是它，因为这份考卷没有咨询师标签；另有 `--labels v9`（A
   口径 v8、crisp B）、`--labels pre_v9`（旧 A、legacy B）。部署 v9 或 v7 的，按它
-  自己那一套判。A 的下限用来分辨 v10 权重与 v7 权重（后者在 v10 标签上 A 约 80）。
-- **考卷天然同分布，验证的是接线，不是模型质量。** 它的标签与训练标签出自同一套
+  自己那一套判。A 的下限高于 v7 权重（在 v10 标签上 A 为 80.5），但脚本按整数百分比
+  打印（v7 显示 `A81%`），所以还要看维度级和 B（见 `eval/README.md`）。
+- **考卷天然同分布，验证的是接线，不是模型质量。** 它的标签与 v10 的训练标签出自同一套
   教师提示词。它用工具包自己的提示词构造与解析器，每次请求都带固定的采样参数
   （优先于 Modelfile）——所以查不出 Modelfile 漏写 `repeat_penalty 1.0`，也查不出
   你自己服务里用了别的提示词、采样设置或解析器。分数要对着平凡基线读：在 v10
@@ -1437,10 +1636,11 @@ W 达标数。此外不作跨运行环境的声明；v10 的闸门是在 Metal �
   要做的集成测试。面向消费者的心理健康部署若绕过闸门、又没有别的独立上游危机
   处理，就直接违反许可证 §3(c)。
 
-### 八、v8 到 v10 的教训
+### 八、v8 到 v10h 的教训
 
 v8、v9 是头两代改动口径本身（A、B 的含义）的模型；v9L 把 B 改了回去，v10 改的是
-「一代模型怎么判」。来龙去脉见英文版 §8，这里只留结论与必须披露的事实。
+「一代模型怎么判」，v10h 改的是合成标签的来源。来龙去脉见英文版 §8，这里只留结论与
+必须披露的事实。
 
 1. **改口径先靠人的裁决，再落到提示词。** 创始人对 A 作了四轮裁决；带前三轮口径
    的教师提示词以他本人在真实消息上的打分为准过了资格考。第四轮的告别规则是此后
@@ -1450,8 +1650,9 @@ v8、v9 是头两代改动口径本身（A、B 的含义）的模型；v9L 把 B
    条，第二批 40 条改 6 条），所以这 80 条里有 61 条，进入训练的 A 标签就等于
    Claude 的预打分。v10 沿用这 80 条（236 条训练行，其中 180 行属于那 61 条）；
    同样沿自 v9 的还有两项：20 行的 A 依 Claude 审核员对告别信号的判断改为 0，50
-   行经 Claude 审核后移出语料。v10 没有新增出自 Claude 的训练标签。你们请盲打：
-   人先打分，看不到任何模型分数。
+   行经 Claude 审核后移出语料。v10 没有新增出自 Claude 的训练标签。v10h 里这 61 条
+   的 A 换回了开放权重教师的分数；创始人改过的 19 条保留，那 50 行仍不在语料里，那
+   20 行告别信号现在用复核分。你们请盲打：人先打分，看不到任何模型分数。
 2. **只重标改动的那一列，并测外溢。** 第一版 A 口径提示词让教师在 W、B 上也变
    保守，尽管 W、B 的口径没变。所以每处改动只动一列：v9L 与 v9 的语料只差 B
    一列，v10 的规则只动检测器判中的行。改完一维，要在校准集上复查其余每一维。
@@ -1480,7 +1681,7 @@ v8、v9 是头两代改动口径本身（A、B 的含义）的模型；v9L 把 B
    测量：参照标签按旧 A 口径打，v10 的 A 与它的一致（453 题中 327 题在 ±0.5 内；
    v7 为 383 题）是有意偏低的。B 则重新有了一项：336/453，与 v7 同数（随包 q8，
    llama.cpp + Metal）。对同一张考卷反复尝试也是一种缓慢的选点——这条线上，真实
-   终评已经判过八代模型（见§三）。
+   终评已经判过十代模型（见§三）。
 8. **推翻闸门，就要公开。我们已经连续两个发布版这样做了。** v9 没过自己预注册的
    五道闸门中的两道：v9 的闸门 4 差一题；v9 的闸门 5（W 安全卷）差得明显——W 达到
    下限的题只有 78.9%，要求 ≥95%（受检 bf16 模型，经 MLX）。按预注册规则 v9 是
@@ -1523,14 +1724,42 @@ v8、v9 是头两代改动口径本身（A、B 的含义）的模型；v9L 把 B
 14. **签字之前，把每道闸门对照负责人已有的裁决查一遍。** G5a 把一项危机处理的
     替代指标设成了硬闸，而创始人此前已两次裁定（v7 选点时、v9 发布前后）：
     危机由上游处理，不归这个模型。结局是一次看到结果之后的豁免——发现「这道闸门
-    其实不算数」最糟的时刻；我们下一份注册不再拿 G5a 设闸。签字之前去问
+    其实不算数」最糟的时刻；v10h 的注册把 G5a 定为只报告。签字之前去问
     那个有权豁免的人：如果只有这一条没过，我们真的拒收吗？
 15. **比例上限保不住任何一句具体的话。** v10 通过 G2a 与 G2b 时，算在内的是§六
     那句话一个加长版本上的翻转（旧 B 卷那道题句末多一句「…，你安排吧。」；短句本身
     不是考题），这两道闸门本来就允许：在 438 题的题池上，v10 把自我消融读成边界的
     次数远少于 v7（4 条对 47 条，均为 q8），却把 v7 发布检查点当初因之入选的那句话读错了。
-    所以这句话不能当作「v10 把自我消融打成 B 0」的证据。对你重要的句子要列成
+    所以这句话不能当作「v10 把自我消融打成 B 0」的证据。v10h 正好是另一面：它把这句
+    话打成 B 0，在 438 题的题池上仍有 4 条翻转，落在别的题上。对你重要的句子要列成
     具名清单，在比例旁边逐句报告读数，并在训练之前决定其中有没有硬线。
+16. **标签来自人工复核时，训练前先从这份复核里冻结一份按组留出的考卷，并量绝对误差。**
+    模型有没有更接近复核，只有复核自己的行才答得出来。训练前我们留出其中 978 行，
+    整组整组地留（849 组：同一对照组、同一段对话的行不拆开）。±0.5 一致率看不见半档的
+    变化，而复核改动过的 35,065 个格子里 71% 只差半档，所以度量用绝对误差。这 978 行
+    上的平均值：v10 0.2554、v10h 0.1422，低 44%（±0.5 一致率 88.6% 与 96.0%）。这个数
+    要对着事先写定的参照线读：恒定 0.5 是 0.6393，旧标签本身 0.2409，生成类别均值表
+    0.2204。这些线
+    不是下限：按旧分、类别和表内位置查表，不用模型，也用不到新消息上，就能与 v10h
+    打平。留出题与训练行出自同一个生成器、同一批复核，所以这里说明的是在合成消息上
+    更接近这份复核，不是真实消息打得更好。
+17. **训练之前，先沿行序查复核有没有漂移，并请人对一部分做双人复核。** 我们的复核
+    分批进行，它不是一把尺子。行序与内容无关，但 W、E 约从第 11,000 行（共 19,704
+    行）开始动，B 约在第 13,800 行接近阶跃，A、H 不动。在约第 13,700 行切一刀，建议分
+    相对原分的平均变化，切点前后依次是 W −0.185 与 −0.036、E −0.112 与 +0.119、B −0.023
+    与 −0.158。数据说明不了原因，而 v10h 学到的是两段的折中：按第 14,000 行分，早段偏差 W +0.03、
+    E +0.04、B −0.08，晚段 W −0.14、E −0.21、B +0.05。能抓到这件事的正是双人复核：
+    复核者建议过重训前先做一轮，我们没做就开训了。先画出每一维的平均变化随行序的走势，
+    再请第二个人盲评全表的抽样。这份复核的来源和限度见技术档案
+    [How it was trained](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#how-it-was-trained)。
+18. **核对最后一个检查点的验证损失。** 按 400 步平均训练损失报警的监测（见§五）看不见
+    训练末尾的崩溃。v10h 第二个种子的最后一个检查点就是这样崩掉的，当时训练机内存吃紧：
+    验证损失 0.686，正常约 0.07，全量重测确认，权重里没有 NaN 或 Inf。候选来自种子 1，
+    不受影响；注册的第三个条件在第二个种子身上仍然满足，但它的平均含这个检查点，这把
+    噪声尺子因此不够干净。随后在注册之外重训了种子 2 作诊断，配置和种子相同，不上真实
+    考卷：最后一个检查点正常（验证损失 0.068），留出卷平均绝对误差 0.1457，受损的种子是
+    0.1475，候选是 0.1422，与候选的差距在种子波动之内。这不改变任何判定，也不能替换候选。
+    任何检查点进入候选或报告之前，先量它的验证损失。
 
 ### 九、许可证义务
 
@@ -1544,7 +1773,7 @@ v8、v9 是头两代改动口径本身（A、B 的含义）的模型；v9L 把 B
 上游危机处理与 AI 披露、不得从分数重识别个人或把分数与身份做超出合法授权
 用途的关联；§5：实质违反 §3 即自动终止授权。
 
-### 附：十二代小史
+### 附：十四代小史
 
 逐代表格与各代数字的口径见英文版附录，这里只列梗概。v2 首蒸 → v3.x 配平 → v4
 审计驱动重修数据 → **v5 拒收**（W 上限准入闸门；真实数据的高退缩轮次（参照 W ≥ 2.5）上，W 被打到接近
@@ -1558,20 +1787,31 @@ v8、v9 是头两代改动口径本身（A、B 的含义）的模型；v9L 把 B
 crisp B 配不上 B 为负权重的公式，见§一）→ **v9L 拒收**（v9 的语料只把 B 一列
 改回 legacy 标签；六道闸门过四道，挂在旧 B 卷成对方向 56/60（要求 58）与真实终评
 H 422/453（下限 425）上（受检 bf16 模型，经 MLX）——教训：通过线落在训练波动
-之内）→ **v10 由创始人决定发布**（v9L 的语料 + 明确意念规则（检测器加确定性
+之内）→ **v10 由创始人决定发布，已被 v10h 取代**（v9L 的语料 + 明确意念规则（检测器加确定性
 代码，改动 179 条训练行的标签）+ 两份最小对照补丁各 150 对，共 20,787 条训练行；
 候选按规则定为种子 1 第 4,800 / 6,000 / 7,200 步融合权重的平均，判的是 q8。
 **按签字的预注册，判定是拒收**：18 项过了 17 项；没过的那一项 G5a 当初是作为危机
 处理的替代指标设的，创始人看到结果后裁定危机处理不在本模型里判定。**由创始人决定
 发布**，是看到结果之后对这一道闸门的豁免（见§六）。真实终评（受检 q8，llama.cpp +
-Metal）：W/E/H 87.4/85.2/93.2%、B 74.2%、决策级 96.0%）。
+Metal）：W/E/H 87.4/85.2/93.2%、B 74.2%、决策级 96.0%）→ **v10r 拒收**（把 v10 的
+语料交给更新的教师重新打标；按 v10 的检查判定，报告的 16 项没过 3 项（G2a、G6d、
+G7）；没有发布）→ **v10h，当前发布版**（沿用 v10 的提示词和配方，18,691 条合成
+训练行的答案换成 Hamo 请的真人咨询师的复核分，不再叠加规则；1,310 条真实行沿用 v10
+的标签，只有那 61 条 Claude 预打分的 A 换回了开放权重教师的分数；留出 978 行，共
+20,001 条训练行；候选规则同 v10，判的是 q8。**按它自己的注册通过**：在 978 道留出的
+合成题上比 v10 更接近复核（平均绝对误差 0.2554 → 0.1422）；v10 的 18 项检查过了
+17 项，没过的是 G5a；G5a、G5b 都是危机处理的替代指标，创始人裁定危机处理不归本模型，
+它的注册因此把这两项定为只报告；其余 16 项全过（见§六）。真实终评（受检 q8，llama.cpp + Metal，对参照标签，不是咨询师
+分数）：W/E/H 87.2/84.8/95.1%、B 76.6%、决策级 97.1%）。
 
 v9、v10 在 A 上的进步，v9 在 crisp B 上的进步，v10 在自我消融与「想死但求助」上
-的进步，都是在同分布合成考卷上测的（见§八第 7 条）。值得复制的不是任何一个
+的进步，都是在同分布合成考卷上测的（见§八第 7 条）。v10h 更接近复核，也是在合成行上
+测的，它们与训练行出自同一个生成器、同一批复核（见§八第 16 条）。值得复制的不是任何一个
 数字，而是流程本身：每代都在不入训的真实留出题上受检，自 v6 起验收标准在该代
-出分前写死。五次拒收不是事故率——是流程在起作用的证据。最近两个发布版是公开推翻
+出分前写死。六次拒收不是事故率——是流程在起作用的证据。v9、v10 是公开推翻
 验收闸门的两次（v4、v6.1 与 v7 的选点属于裁量，见§六），我们不粉饰：v9 没过五道闸门中的两道，
 其中一道在 W 安全卷上；v10 没过 18 项检查中的一项 G5a（当初是作为危机处理的替代
-指标设的），按签字的预注册判定是「拒收」。两者都由创始人决定发布。能被豁免的闸门，强度只取决于豁免之后的披露——所以每一项失败
+指标设的），按签字的预注册判定是「拒收」。两者都由创始人决定发布。v10h 不算第三次：
+它的注册在训练前就把 G5a、G5b 定为只报告。能被豁免的闸门，强度只取决于豁免之后的披露——所以每一项失败
 都写在讲验收的地方，门槛没有事后改动。你若推翻自己的闸门，或者像我们对「重调
 阈值」那样发现自己给过的建议是错的，也请同样公开。

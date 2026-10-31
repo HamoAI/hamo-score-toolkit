@@ -8,8 +8,8 @@ labels: score-disagreement
 
 **此前对话（可选，最多 3 轮）**
 
-**模型版本 / 文件（必填）/ Model version or file (required)**  例如 e.g. v10 q8 GGUF · v9 q8 GGUF · v7 q8 GGUF · safetensors revision
-（各版本的分数不可比：A 的含义在 v9 改过，v10 沿用；B 在 v9 改过，v10 又改回 legacy 口径 / scores are not comparable across versions: A changed meaning at v9 and stays changed in v10; B changed at v9 and changed back to the legacy rubric in v10）
+**模型版本 / 文件（必填）/ Model version or file (required)**  例如 e.g. v10h q8 GGUF · v10 q8 GGUF · v9 q8 GGUF · v7 q8 GGUF · safetensors revision
+（各版本的分数不可比：A 的含义在 v9 改过，v10 沿用；B 在 v9 改过，v10 又改回 legacy 口径；v10h 的合成训练标签由 Hamo 请的真人咨询师复核并重新打分，与 v10 的分数也不可比 / scores are not comparable across versions: A changed meaning at v9 and stays changed in v10; B changed at v9 and changed back to the legacy rubric in v10; v10h's synthetic training labels were re-scored by human counselors engaged by Hamo, so its scores are not comparable with v10's either）
 
 **模型给的分**  A? W? E? H? B?
 

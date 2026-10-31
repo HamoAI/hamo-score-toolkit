@@ -95,7 +95,8 @@ def test_exam_label_sets():
     for name in ("run_exam", "compare_quants"):
         spec = importlib.util.spec_from_file_location(name, os.path.join(root, "eval", name + ".py"))
         mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-        assert list(mod.LABEL_KEYS)[0] == "v10"          # the default label set is the served version's
+        assert list(mod.LABEL_KEYS)[0] == "v10h"         # the default name is the served version's
+        assert mod.LABEL_KEYS["v10h"] == mod.LABEL_KEYS["v10"] == "labels"  # no counselor labels: v10h grades on v10's
         keys = keys or mod.LABEL_KEYS
         assert mod.LABEL_KEYS == keys
     for r in rows:

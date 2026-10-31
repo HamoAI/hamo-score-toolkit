@@ -12,10 +12,13 @@ Safe-by-default usage::
         stress = update_stress(r.scores, current_stress=3.0)
         state = energy_state(stress)  # cut-offs were set on legacy-rubric scores — see stress.py
 
-From 0.3.0 the reference server serves v10. Scores are not comparable across
-model versions: A changed meaning at v9 (rubric v8) and stays changed in v10;
-B changed at v9 (the narrower "crisp" rubric) and returned to the legacy rubric
-in v10. Do not feed v9 scores into update_stress() — see stress.py.
+From 0.4.0 the reference server serves v10h (0.3.x served v10). Scores are not
+comparable across model versions: A changed meaning at v9 (rubric v8) and stays
+changed in v10; B changed at v9 (the narrower "crisp" rubric) and returned to the
+legacy rubric in v10. v10h keeps v10's prompts and training recipe, with the
+synthetic training labels re-scored by human counselors engaged by Hamo: A and W
+read lower on average than v10's, and all-zero outputs are fewer. Do not feed v9
+scores into update_stress() — see stress.py.
 """
 from .client import OllamaClient, TransformersClient, ScoreResult, score_message
 from .parse import parse_scores, DIMS
@@ -23,7 +26,7 @@ from .prompt import build_prompt, STUDENT_PROMPT
 from .safety import CrisisGate, CrisisResult, DISCLOSURE_EN, DISCLOSURE_ZH
 from .stress import energy_state, update_stress
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 __all__ = [
     "OllamaClient", "TransformersClient", "ScoreResult", "score_message",
     "parse_scores", "DIMS", "build_prompt", "STUDENT_PROMPT",

@@ -7,7 +7,7 @@ do not reorder fields: any deviation is out-of-distribution.
 Trimming guards are built in (3 turns × 200 chars context, 500-char message):
 they keep worst-case prefill within interactive latency on CPU-only servers
 and preserved 98.1% score self-agreement (±0.5) when validated in August 2026
-on the weights of that time; this has not been re-measured on v10.
+on the weights of that time; this has not been re-measured on v10 or v10h.
 """
 from __future__ import annotations
 

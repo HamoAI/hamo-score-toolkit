@@ -15,7 +15,7 @@ agreement alone will never surface it.
 An earlier version of this note cited a larger gap ("every dimension drifts
 toward zero"); that compared our v6.1 q8_0 against community GGUF builds made
 from older (v4) weights, so it was mostly a version gap, not a quantization gap.
-See eval/README.md for the v7 table (quantization has not been re-measured on v9 or v10).
+See eval/README.md for the v7 table (quantization has not been re-measured on v9, v10 or v10h).
 
 This script runs the toolkit's synthetic exam against two or more deployments
 and reports three things per pair:
@@ -29,10 +29,12 @@ and reports three things per pair:
 
 Usage (each build is an ollama tag you created from a different GGUF). The repo
 ships only server/Modelfile — copy it once per extra build and change only its
-FROM line. We publish no q6_k/q4_k_m GGUF of v7, v9 or v10; quantize the weights yourself
-(llama.cpp: convert_hf_to_gguf.py to f16, then llama-quantize; see eval/README.md).
-Per-build agreement is graded against the exam's v10 labels by default; pass
---labels v9 when comparing v9 builds and --labels pre_v9 when comparing v7 builds.
+FROM line. We publish no q6_k/q4_k_m GGUF of v7, v9, v10 or v10h; quantize the weights
+yourself (llama.cpp: convert_hf_to_gguf.py to f16, then llama-quantize; see eval/README.md).
+Per-build agreement is graded against the exam's v10 labels by default: there are no
+counselor labels for this exam, so --labels v10h (the default) and --labels v10 are two
+names for the same labels. Pass --labels v9 when comparing v9 builds and --labels pre_v9
+when comparing v7 builds.
 
     cp server/Modelfile Modelfile.q4                    # then edit FROM: ...q4_k_m.gguf
     ollama create hamo-q8  -f server/Modelfile          # FROM: the shipped q8_0 GGUF
@@ -64,8 +66,9 @@ BASELINE_STRESS = 5.0
 # withdrawal this high (docs/finetune.md uses the term for reference W >= 2.5 on
 # real turns). The W lower/higher split is reported again on this subset.
 HIGH_W = 1.5
-# label set -> key in synthetic_exam.jsonl (same mapping as run_exam.py)
-LABEL_KEYS = {"v10": "labels", "v9": "labels_v9", "pre_v9": "labels_pre_v9"}
+# label set -> key in synthetic_exam.jsonl (same mapping as run_exam.py). v10h is the
+# default and shares v10's key: this exam has no counselor labels.
+LABEL_KEYS = {"v10h": "labels", "v10": "labels", "v9": "labels_v9", "pre_v9": "labels_pre_v9"}
 
 
 def run_build(model: str, base_url: str, exam: list, timeout: float) -> dict:
@@ -147,8 +150,9 @@ def main() -> None:
     ap.add_argument("--base-url", default="http://127.0.0.1:11434")
     ap.add_argument("--timeout", type=float, default=30.0)
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--labels", choices=list(LABEL_KEYS), default="v10",
-                    help="label set for per-build agreement: v10 (default), v9 (for v9 builds) or pre_v9 (for v7 builds)")
+    ap.add_argument("--labels", choices=list(LABEL_KEYS), default="v10h",
+                    help="label set for per-build agreement: v10h (default) and v10 are two names for v10's labels"
+                         " (this exam has no counselor labels), v9 (for v9 builds) or pre_v9 (for v7 builds)")
     args = ap.parse_args()
 
     exam = [json.loads(l) for l in open(os.path.join(HERE, "synthetic_exam.jsonl"))]
