@@ -71,7 +71,7 @@ requires in consumer-facing mental-wellness deployments.
 >   `TransformersClient()` and `from_pretrained("HamoAI/hamo-score-0.6b")` load Hugging Face
 >   `main`, which is v10h from 2026-10-31 (UTC), was v10 from 2026-10-06 (UTC) until then
 >   and v9 from 2026-09-30 before that. The reference server registers the unversioned ollama
->   name `hamo-score-0.6b`, so `docker compose up` from 0.4.0 replaces whatever that name served
+>   name `hamo-score-0.6b`, so `docker compose up` from `main` replaces whatever that name served
 >   before with v10h.
 > - **v10, v9 and v7 remain available.** `gguf/hamo-score-0.6b-v10.q8.gguf`,
 >   `gguf/hamo-score-0.6b-v9.q8.gguf` and `gguf/hamo-score-0.6b-v7.q8.gguf` sit next to the v10h
@@ -96,7 +96,8 @@ requires in consumer-facing mental-wellness deployments.
 # 0. clone this repo — server/Modelfile and eval/ live here, not in the pip package
 git clone https://github.com/HamoAI/hamo-score-toolkit.git && cd hamo-score-toolkit
 
-# 1. get the model (one-time) — v10h; for v10, v9 or v7, fetch that version's GGUF instead and edit FROM in server/Modelfile
+# 1. get the model, one-time. huggingface_hub provides the hf command. For v10, v9 or v7 fetch that GGUF instead and edit FROM in server/Modelfile
+pip install -U huggingface_hub
 hf download HamoAI/hamo-score-0.6b gguf/hamo-score-0.6b-v10h.q8.gguf --local-dir /tmp/hamo
 ollama create hamo-score-0.6b -f server/Modelfile
 
@@ -127,10 +128,16 @@ Metal). On this input the v10 q8 GGUF returns A 2.0, B 2.0, the v9 q8 GGUF
 B 0.0 and the v7 q8 GGUF B 1.5, the last two with W 0.5: if you see one of
 those, check which GGUF your model was built from.
 
+`Error: 400 Bad Request: invalid model name` from `ollama create` (ollama
+0.40.13) means the GGUF is not at the path in `FROM`;
+`HTTP Error 404: Not Found` from the client means ollama has no model of that
+name.
+
 Keep sampling neutral: temperature 0, `repeat_penalty 1.0`, `top_k 0`,
 `top_p 1.0`. The toolkit's clients and `server/Modelfile` already do; set all
 four yourself if you call the model any other way. Measured on v10: at
-`repeat_penalty 1.1` (ollama's default), fabrication on the old B exam (legacy
+`repeat_penalty 1.1`, ollama's default through 0.32.9 (1.0 from 0.32.10),
+fabrication on the old B exam (legacy
 key) — no-boundary
 items (five classes) and low arms of pairs scored B ≥ 1.0 — rises from 3/104
 (2.9%) to 15/104 (14.4%) for the shipped v10 q8 GGUF (llama.cpp with Metal).
@@ -141,28 +148,85 @@ Run the whole pipeline as an HTTP service:
 
 ```bash
 git clone https://github.com/HamoAI/hamo-score-toolkit.git && cd hamo-score-toolkit/server
-docker compose up          # downloads the v10h GGUF (639MB, one-time), creates + warms the model
+docker compose up
 ```
+
+It pulls the images, downloads the v10h GGUF, then creates and warms the model.
+A first run pulls about 2.9 GB of images and the 639 MB GGUF, and takes about
+8.7 GB of disk (measured on linux/arm64; x86 not measured). The GGUF is fetched
+once per `model-cache` volume. Use `main`, as these commands do: the compose
+file at the `v0.4.0` tag fails at the download step.
 
 ```bash
 curl -s localhost:8080/score -H 'content-type: application/json' \
   -d '{"message": "虽然还是有点提不起劲，不过今天把拖了两周的体检约上了", "history": [{"role": "assistant", "content": "这周过得怎么样？"}], "current_stress": 3.0}'
-# → {"crisis": {"triggered": false, "matched": []}, "scores": {"A": 1.5, "W": 0.0, "E": 0.0, "H": 0.0, "B": 1.5}, "latency_ms": ..., "stress": 2.4, "energy_state": "positive"}
 ```
 
-The scores in this sample are the read-out given above (v10h q8 GGUF, llama.cpp
-with Metal); `stress` and `energy_state` follow from them. We have no recorded
-run of this request through the Docker server (the same GGUF through ollama on
-CPU), where a read-out can occasionally differ: in a 100-item check of the v10h
-GGUF, ollama on an ARM CPU server and llama.cpp with Metal agreed exactly on 96
-with the server's prompt cache off. In the same kind of check on v10 they agreed
-on 98, and on 95 in an earlier run with the cache on (ollama 0.32.5's default,
-which the reference compose file does not switch off).
+It returns:
+
+```text
+{"crisis": {"triggered": false, "matched": []}, "scores": {"A": 1.5, "W": 0.0, "E": 0.0, "H": 0.0, "B": 1.5}, "latency_ms": ..., "stress": 2.4, "energy_state": "positive"}
+```
+
+Recorded on 2026-10-31 on one Apple-silicon Mac (Docker under Colima, arm64
+CPU, ollama 0.40.13): `docker compose up` from a clean clone needed no other
+step, and this request returned exactly these scores, `stress` and
+`energy_state`. The VM had 4 CPUs and 6 GiB and the images were already pulled.
+On the VM's first boot `/healthz` timed out until `systemd-logind`, spinning
+inside the VM, was restarted; after `colima stop` and `start` this did not
+recur. Compose tracks `ollama/ollama:latest`, which was 0.40.13 on that date, so
+a later run may use another version. We have no x86 run. A read-out can still differ from llama.cpp
+with Metal: on the exam's 195 questions, with the model warmed and the prompt
+cache off, 184 were identical and all were within ±0.5, and in a 100-item check
+through ollama on an ARM CPU server, also with the cache off, 96 were identical.
 
 `POST /score` runs gate → score, then smooth → bucket when the request carries
 `current_stress`; crisis-gated requests never reach the model. `GET /healthz`
-probes the model end-to-end. To serve v10, v9 or v7 instead, follow the note at
-the top of `server/docker-compose.yml`.
+sends the model a short probe and reports `ok` on any non-empty reply: it shows
+the model answers, not that a score parses. It returns HTTP 200 either way, so
+read the `ok` field; a busy model can report false. To serve v10, v9 or v7 instead,
+follow the note at the top of `server/docker-compose.yml`.
+
+Operating notes:
+
+- **Authentication.** `POST /score` has no authentication, and compose publishes
+  port 8080 on all interfaces. Keep it behind your own access control, or restrict
+  it to this machine: in `server/docker-compose.yml` change the `api` service's
+  `ports` line to `"127.0.0.1:8080:8080"`.
+- **Failures.** The server has no fallback of its own. On a timeout (8 s by
+  default; set `SCORE_TIMEOUT` under the `api` service's `environment`) or with
+  the model down, `POST /score` returns HTTP 500 with the body
+  `Internal Server Error`. A reply that does not parse returns HTTP 200 with
+  `scores: null`. A gate hit also has `scores: null`, with `crisis.triggered`
+  true: read `crisis` first and route those to your crisis pathway. Treat the
+  other two cases as skip or fallback.
+- **`current_stress`** must be a finite number from 0 to 10. The server does not
+  check it: a value outside the range can come back unchanged, and NaN or
+  Infinity can give a 500 or a wrong result.
+- **Unknown fields.** The context field is `history`. The server ignores unknown
+  fields without an error, so a request that sends `context` is scored with no
+  context.
+- **Chat tokens.** The server does not escape client text: a message containing
+  `<|im_end|>` and `<|im_start|>` can forge a turn and change what gets scored.
+  Remove them before you call it
+  ([integration guide](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md)).
+- **Stopped download.** If `setup` stops after `uploading GGUF blob` with curl
+  error 22, the cached GGUF does not match the digest in the compose file. Usually
+  it is partial, from a stopped download; `docker compose down` and a new clone do
+  not clear it. If you edited the file for another version, check both digests
+  first. Otherwise remove the file and start again:
+  `docker compose run --rm --no-deps --entrypoint rm setup -f /models/hamo-score-0.6b-v10h.q8.gguf`,
+  then `docker compose up`.
+- **Restarting.** To restart the containers, use `docker compose stop` then
+  `start`. With the compose file unchanged, `docker compose up -d` restarts
+  nothing: it re-runs `setup`, which warms the model. After you edit the compose
+  file, run `docker compose up -d`: it recreates the changed services, and `stop`
+  and `start` do not apply the edit. Plain `docker compose restart` can leave
+  `setup` failed and the model cold; the first request then loads the model
+  (about 2 s on the test Mac; a load slower than the 8-second timeout does not
+  finish, reproduced only under an artificial CPU cap, see the
+  [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)),
+  and `docker compose up -d` repairs it.
 
 ## Verify your deployment
 
@@ -171,40 +235,50 @@ handwritten crisis-gate cases. Run it from the repo root against your own
 deployment, with the label set of the version you serve:
 
 ```bash
-python eval/run_exam.py                    # v10h deployment (default: v10's label set, see below)
-python eval/run_exam.py --labels v10       # v10 deployment (same labels, its own band)
-python eval/run_exam.py --labels v9        # checking a v9 deployment on purpose
-python eval/run_exam.py --labels pre_v9    # checking a v7 deployment on purpose
+python eval/run_exam.py
+python eval/run_exam.py --labels v10
+python eval/run_exam.py --labels v9
+python eval/run_exam.py --labels pre_v9
 ```
+
+The first line is for a v10h deployment (its default labels are v10's set, see
+below). `--labels v10` is for a v10 deployment (same labels, its own band).
+`--labels v9` and `--labels pre_v9` check a v9 or v7 deployment on purpose.
 
 `run_exam.py` calls the ollama endpoint itself (`--base-url`, default
 `http://127.0.0.1:11434`), not `POST /score`, and the Docker reference server
 does not publish that port. To check that server, add
 `ports: ["127.0.0.1:11435:11434"]` to the `ollama` service in
-`server/docker-compose.yml`, run `docker compose up` again and pass
-`--base-url http://127.0.0.1:11435`. With the defaults the script fails, or
+`server/docker-compose.yml`, run `docker compose up -d` in `server/`, then from
+the repo root pass `--base-url http://127.0.0.1:11435`. With the defaults the script fails, or
 grades whatever a host ollama serves as `hamo-score-0.6b`.
 
 Pass band for v10h: dimension-level 84–90%, each dimension ≥ 75%, **A ≥ 81**,
 JSON ≥ 99%, gate 10/10 (a keyword list; it does not depend on the model).
 Reference, on an M1 Pro: 86.7% for the shipped q8 GGUF (llama.cpp with Metal,
 `server/Modelfile` template, neutral sampling) and 86.8% for the v10h bf16
-safetensors (MLX). The A floor sits above v7 weights (A 80.5 on these labels),
-but the script prints whole percents (v7 shows `A81%`), so also check the
+safetensors (MLX). On one Apple-silicon Mac (Docker under Colima, arm64 CPU,
+ollama 0.40.13) the exam through the reference server's ollama reads 86.7% with
+the model warmed, as compose leaves it, and the script prints `A82%`, not
+`A83%`; it reads 86.4% if the exam's first question is the first request after
+a model load. Both are inside the band. On llama.cpp with Metal the A floor sits
+above v7 weights (A 80.5 on these labels); through ollama on Docker, warmed, v7
+reads A 81.0, exactly on the floor. The script prints `A81%` either way, so also check
+the
 dimension-level number and B
 ([eval/README.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/eval/README.md));
 v9 weights show up as B 57.4. A v10 deployment keeps its own
-band: the same lines with **A ≥ 86%**, reference 87.3%. v10 reads A 91.8 where
+band: the same lines with **A ≥ 86%**, reference 87.3%. On llama.cpp with Metal
+v10 reads A 91.8 where
 v10h reads 82.6, so the A line also tells the two apart. Bands for the other
 label sets, trivial baselines, quantization and troubleshooting:
 [eval/README.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/eval/README.md).
 
-**A pass certifies wiring, not model quality.** There are no counselor labels
+**A pass checks wiring, not model quality.** It shows that your deployment agrees with the exam's labels about as well as the reference does, and that `num_predict` is not too small, through the toolkit's own prompt, sampling and parser, not yours. It does not show which version you serve (v10 weights also pass v10h's band), and it does not check the chat template or `stop`: on ollama 0.40.13 tags without them read the same on 60 questions. Check those with `ollama show <tag> --template` and `--parameters`. For the v10h GGUF on ollama 0.32.5, 0.40.12 and 0.40.13, `--template` prints the GGUF's own template, not the one in `server/Modelfile` (see the [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)). On the Docker server, run them in `server/`, prefixed with `docker compose exec ollama`. There are no counselor labels
 for this exam: v10h is graded on v10's label set, so a gap against v10's number
 says nothing about which is right. Those labels come from the same teacher
 prompts as v10's training labels, so for v10 the exam is in-distribution by
-construction, and it runs through the toolkit's own prompt, sampling and
-parser, not yours. A constant 0.5 output already scores 77.9% on these labels,
+construction. A constant 0.5 output already scores 77.9% on these labels,
 so read the per-dimension lines and the distinct-read-out count that
 `run_exam.py` prints, not the headline alone.
 
@@ -260,20 +334,30 @@ is your job.
 > - **关于 v9 的更正。** v9 的 B 按 crisp 口径打分，多数普通消息的 B 是 0，B 为负权重的压力公式（`hamo_score.stress` 就是一个）里减压项随之消失：真实终评上，按 v9 的分数算出的平均每轮原始压力变化是 +0.37，考卷的参照标签是 −0.68，v10 是 −0.72，v10h 是 −0.63。重调阈值或 B 的权重都修不好，因为权重乘的是 0；把 v9 的分数喂进这类公式的，请换到 v10h 或 v10，或退回 v7，也不要把按 v9 分数累积的压力值带进新的部署。
 > - **验收状态。** v10h 的预注册在训练前冻结，主要问题是：它是否比 v10 更接近咨询师的复核？在 978 道留出的合成题上，答案是肯定的。预注册还沿用了 v10 的 18 项检查，v10h 过了 17 项。没过的是 G5a；G5a 和 G5b 都是危机处理的替代指标，创始人裁定危机处理不归本模型，预注册因此把这两项定为只报告。其余 16 项全过。与咨询师的比较只在合成消息上：真实对话没有咨询师分数；在真实终评上，以参照评分器为准，v10h 与 v10 打平。完整说明，以及 v10 自己的验收状态（按签字的预注册为「拒收」，由创始人决定发布），见[技术档案](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)。
 > - **已知的 B 符号翻转。** 自我消融句「行，我全听你的，你说哪天去就哪天去。」v10 打 **B 2.5**，v10h、v9 与 v7 打 0（无上下文；各版本随包 q8 GGUF，llama.cpp + Metal）。这只是一句话，也正是此前的模型卡用来说明「仪器不可把自我消融读成边界」的例句。v10h 的符号翻转条数在预注册的上限之内，但不是 0（596 道 B 应为 0 的题里有 4 道）：不要把 v10h 或 v10 给出的高 B 当成「守住了边界」的证据（详见 [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)）。
-> - **跑哪个模型不由 pip 版本决定。** `pip install -U hamo-score` 不换任何权重：ollama 里的模型仍跑它创建时用的那个 GGUF；`TransformersClient()` 与 `from_pretrained("HamoAI/hamo-score-0.6b")` 加载的是 Hugging Face 的 `main`，它自 2026-10-31（UTC）起是 v10h，此前自 2026-10-06（UTC）起是 v10，再之前自 2026-09-30 起是 v9。参考服务器在 ollama 里用不带版本号的模型名 `hamo-score-0.6b`，所以用 0.4.0 执行 `docker compose up`，会把这个名字下原先的模型换成 v10h。
+> - **跑哪个模型不由 pip 版本决定。** `pip install -U hamo-score` 不换任何权重：ollama 里的模型仍跑它创建时用的那个 GGUF；`TransformersClient()` 与 `from_pretrained("HamoAI/hamo-score-0.6b")` 加载的是 Hugging Face 的 `main`，它自 2026-10-31（UTC）起是 v10h，此前自 2026-10-06（UTC）起是 v10，再之前自 2026-09-30 起是 v9。参考服务器在 ollama 里用不带版本号的模型名 `hamo-score-0.6b`，所以用 `main` 执行 `docker compose up`，会把这个名字下原先的模型换成 v10h。
 > - **v10、v9、v7 仍可用。** `gguf/hamo-score-0.6b-v10.q8.gguf`、`gguf/hamo-score-0.6b-v9.q8.gguf` 与 `gguf/hamo-score-0.6b-v7.q8.gguf` 和 v10h 的文件一起放在 `main` 上，三者的 safetensors 在固定版本。摘要、版本号、怎样固定或切换（ollama、Docker、transformers）以及其余升级步骤，见[集成指南·升级到 v10h](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#升级到-v10h)。
 > - **0.4.0：** 参考服务器改跑 v10h，它的合成标签由 Hamo 请的真人咨询师重新打分；库的行为没有变化。
 > - **0.3.1：** 只改文档——危机处理不在本模型的职责范围内，文档不再拿危机处理来衡量这个模型；代码行为、权重与考卷均无变化。
 
-**五分钟上手**：代码见上方英文段。先 `git clone` 本仓库（`server/Modelfile` 与 `eval/` 在仓库里，不在 pip 包里）；要用 v10、v9 或 v7，就改拉对应的 GGUF，并改 `server/Modelfile` 的 FROM。完整链路是 **闸门 → 评分 → 平滑 → 状态桶**；分数是逐句信号，不要凭单句原始分做任何决定。示例注释里的读数是随包 v10h q8 GGUF 的输出（llama.cpp + Metal）；同一输入，v10 q8 GGUF 给出 A 2.0、B 2.0，v9 q8 GGUF 给出 B 0.0，v7 q8 GGUF 给出 B 1.5，后两者的 W 都是 0.5。打出这些读数的，请核对模型是用哪个 GGUF 建的。
+**五分钟上手**：代码见上方英文段。先 `git clone` 本仓库（`server/Modelfile` 与 `eval/` 在仓库里，不在 pip 包里）；要用 v10、v9 或 v7，就改拉对应的 GGUF，并改 `server/Modelfile` 的 FROM。完整链路是 **闸门 → 评分 → 平滑 → 状态桶**；分数是逐句信号，不要凭单句原始分做任何决定。示例注释里的读数是随包 v10h q8 GGUF 的输出（llama.cpp + Metal）；同一输入，v10 q8 GGUF 给出 A 2.0、B 2.0，v9 q8 GGUF 给出 B 0.0，v7 q8 GGUF 给出 B 1.5，后两者的 W 都是 0.5。打出这些读数的，请核对模型是用哪个 GGUF 建的。`ollama create` 报 `Error: 400 Bad Request: invalid model name`（ollama 0.40.13）说明 GGUF 不在 `FROM` 写的路径上；客户端报 `HTTP Error 404: Not Found` 说明 ollama 里没有这个名字的模型。
 
-采样要保持中性：temperature 0、`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`。工具包的客户端与 `server/Modelfile` 已设好；用别的方式调用模型时，四项都要自己设。在 v10 上测得：`repeat_penalty` 取 1.1（ollama 的默认值）时，随包 v10 q8 GGUF（llama.cpp + Metal）在旧 B 卷（legacy 答案）上的造分（五类没有边界的单题与成对题的低臂被打到 B ≥ 1.0）从 3/104（2.9%）升到 15/104（14.4%）。
+采样要保持中性：temperature 0、`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`。工具包的客户端与 `server/Modelfile` 已设好；用别的方式调用模型时，四项都要自己设。在 v10 上测得：`repeat_penalty` 取 1.1（ollama 0.32.9 及以前的默认值，0.32.10 起为 1.0）时，随包 v10 q8 GGUF（llama.cpp + Metal）在旧 B 卷（legacy 答案）上的造分（五类没有边界的单题与成对题的低臂被打到 B ≥ 1.0）从 3/104（2.9%）升到 15/104（14.4%）。
 
-**一键服务器**：`cd server && docker compose up`，自动拉 v10h GGUF（639MB，仅首次）、建模型、预热。`POST localhost:8080/score` 返回危机判定与五维分，请求里带 `current_stress` 时另返回压力值与状态桶；危机命中的请求不会送到模型；`GET /healthz` 端到端探活。想改跑 v10、v9 或 v7，见 `server/docker-compose.yml` 顶部的说明。
+**一键服务器**：`cd server && docker compose up`，自动拉镜像和 v10h GGUF、建模型、预热。首次运行要拉约 2.9 GB 镜像和 639 MB 的 GGUF，占约 8.7 GB 磁盘（linux/arm64 实测，x86 未测）。GGUF 每个 `model-cache` 卷下载一次。请用 `main`：`v0.4.0` 标签里的 compose 文件会在下载这一步失败。2026-10-31 在一台 Apple 芯片的 Mac 上实测（Colima 里的 Docker，arm64 CPU，ollama 0.40.13）：干净克隆后 `docker compose up` 不需要别的步骤，上方英文段那条示例请求返回的分数、`stress` 与 `energy_state` 与那里印的完全相同，自检卷得 86.7%，在合格带内；虚拟机是 4 核 6 GiB，镜像已提前拉好；虚拟机第一次开机时 `/healthz` 一直超时，直到重启虚拟机里空转的 `systemd-logind`，`colima stop` 再 `start` 之后没有再出现。compose 跟随 `ollama/ollama:latest`，当时是 0.40.13，以后运行可能是别的版本。没有 x86 上的记录。`POST localhost:8080/score` 返回危机判定与五维分，请求里带 `current_stress` 时另返回压力值与状态桶；危机命中的请求不会送到模型；`GET /healthz` 给模型发一条短探测，收到非空回复就报 `ok`：它说明模型有应答，不说明分数能解析。它总是返回 HTTP 200，所以要读 `ok` 字段；模型忙时也可能报 false。想改跑 v10、v9 或 v7，见 `server/docker-compose.yml` 顶部的说明。
 
-**部署自检**：工具包自检卷是 195 道合成题（教师标注）加 10 条手写危机闸门用例。在仓库根目录跑 `python eval/run_exam.py`，部署哪个版本就按哪套标签判卷：默认 `--labels v10h`（v10 那套标签的默认名字，这份考卷没有咨询师标签），v10 用 `--labels v10`（同一套标签，按 v10 自己的合格带），v9 用 `--labels v9`，v7 用 `--labels pre_v9`。`run_exam.py` 直接调用 ollama 接口（`--base-url`，默认 `http://127.0.0.1:11434`），不走 `POST /score`，而 Docker 参考服务器没有把这个端口映射到宿主机：要考它，先在 `server/docker-compose.yml` 的 `ollama` 服务下加 `ports: ["127.0.0.1:11435:11434"]`，重新 `docker compose up`，再带上 `--base-url http://127.0.0.1:11435`。按默认参数，脚本要么报错，要么考到宿主机 ollama 里名为 `hamo-score-0.6b` 的模型。v10h 的合格带：维度级 84–90%、各维 ≥ 75%、**A ≥ 81**、JSON ≥ 99%、闸门 10/10（闸门是关键词表，与模型无关）。参考值（M1 Pro）：随包 q8 GGUF（llama.cpp + Metal，`server/Modelfile` 的模板加中性采样）86.7%，v10h bf16 safetensors（MLX）86.8%。A 的下限高于 v7 权重（这套标签上 A 为 80.5），但脚本按整数百分比打印（v7 显示 `A81%`），所以还要看维度级和 B（见 [eval/README.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/eval/README.md)）；拿成 v9 的权重，B 只有 57.4。部署 v10 的沿用 v10 的合格带：其余各条相同，**A ≥ 86%**，参考值 87.3%。v10 的 A 是 91.8，v10h 是 82.6，看 A 这一行也能分出跑的是哪一版。其余标签的合格带、平凡基线、量化与排查办法见 [eval/README.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/eval/README.md)。
+运行时要注意：
 
-**过关证明的是接线正确，不证明模型质量。** 这份考卷没有咨询师标签：v10h 按 v10 那套标签判卷，所以它与 v10 的分数差说明不了谁对。这套标签与 v10 的训练标签出自同一套教师提示词，对 v10 天然同分布；它走的是工具包自己的提示词、采样参数与解析器，不检查你自己的。恒定输出 0.5 在这套标签上就能得 77.9%，所以不要只看总分，还要看 `run_exam.py` 打印的分维成绩与不同读数的种数。
+- **认证。** `POST /score` 没有认证，compose 把 8080 端口发布在所有网卡上。请放在你自己的访问控制之后，或只在本机开放：把 `server/docker-compose.yml` 里 `api` 服务的 `ports` 改成 `"127.0.0.1:8080:8080"`。
+- **失败。** 服务本身没有回落。超时（默认 8 秒；要改就在 `api` 服务的 `environment` 里设 `SCORE_TIMEOUT`）或模型不在时，`POST /score` 返回 HTTP 500，正文是 `Internal Server Error`。回复解析不出来时返回 HTTP 200，`scores` 为 null。闸门命中时 `scores` 同样是 null，但 `crisis.triggered` 为 true：要先读 `crisis`，命中的转入你的危机处理路径。其余两种情况按跳过或回落处理。
+- **`current_stress`** 必须是 0 到 10 之间的有限数。服务不做校验：超出范围的值可能原样返回，NaN 或 Infinity 可能得到 500 或错误结果。
+- **未知字段。** 上下文字段叫 `history`。服务会忽略未知字段且不报错，所以写成 `context` 的请求是在没有上下文的情况下评分的。
+- **聊天标记。** 服务不转义客户端文本：消息里带 `<|im_end|>` 和 `<|im_start|>` 就能伪造一轮对话，改变实际被评分的内容。调用前请去掉这两个标记（见[集成指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md)）。
+- **下载中断。** 如果 `setup` 在 `uploading GGUF blob` 之后以 curl 错误 22 退出，说明缓存的 GGUF 与 compose 文件里的摘要对不上。通常是文件不完整，下载被中断过；`docker compose down` 和重新克隆都清不掉它。如果你为别的版本改过这个文件，先核对两处摘要。否则删掉这个文件再启动：`docker compose run --rm --no-deps --entrypoint rm setup -f /models/hamo-score-0.6b-v10h.q8.gguf`，然后 `docker compose up`。
+- **重启。** 要重启容器，用 `docker compose stop` 再 `start`。compose 文件没改时，`docker compose up -d` 不重启任何东西，只重跑 `setup` 并预热模型。改过 compose 文件后要运行 `docker compose up -d`：它会重建改动的服务，`stop` 和 `start` 不会应用改动。直接 `docker compose restart` 可能让 `setup` 失败、模型保持未加载；这时第一条请求会加载模型（测试用的 Mac 上约 2 秒；比 8 秒超时更慢的加载完不成，只在人为限制 CPU 时复现过，见 [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)），运行一次 `docker compose up -d` 也能恢复。
+
+**部署自检**：工具包自检卷是 195 道合成题（教师标注）加 10 条手写危机闸门用例。在仓库根目录跑 `python eval/run_exam.py`，部署哪个版本就按哪套标签判卷：默认 `--labels v10h`（v10 那套标签的默认名字，这份考卷没有咨询师标签），v10 用 `--labels v10`（同一套标签，按 v10 自己的合格带），v9 用 `--labels v9`，v7 用 `--labels pre_v9`。`run_exam.py` 直接调用 ollama 接口（`--base-url`，默认 `http://127.0.0.1:11434`），不走 `POST /score`，而 Docker 参考服务器没有把这个端口映射到宿主机：要考它，先在 `server/docker-compose.yml` 的 `ollama` 服务下加 `ports: ["127.0.0.1:11435:11434"]`，在 `server/` 下运行 `docker compose up -d`，再回到仓库根目录，带上 `--base-url http://127.0.0.1:11435`。按默认参数，脚本要么报错，要么考到宿主机 ollama 里名为 `hamo-score-0.6b` 的模型。v10h 的合格带：维度级 84–90%、各维 ≥ 75%、**A ≥ 81**、JSON ≥ 99%、闸门 10/10（闸门是关键词表，与模型无关）。参考值（M1 Pro）：随包 q8 GGUF（llama.cpp + Metal，`server/Modelfile` 的模板加中性采样）86.7%，v10h bf16 safetensors（MLX）86.8%。在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13），经参考服务器的 ollama 考这份卷：模型已预热（compose 启动后的状态）时得 86.7%，脚本打印 `A82%`，不是 `A83%`；如果第一题就是模型加载后的第一条请求，得 86.4%。两者都在带内。在 llama.cpp + Metal 上，A 的下限高于 v7 权重（这套标签上 A 为 80.5）；经 Docker 里的 ollama，模型已预热时，v7 的 A 是 81.0，正好压线。两种情况脚本都打印 `A81%`，所以还要看维度级和 B（见 [eval/README.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/eval/README.md)）；拿成 v9 的权重，B 只有 57.4。部署 v10 的沿用 v10 的合格带：其余各条相同，**A ≥ 86%**，参考值 87.3%。在 llama.cpp + Metal 上，v10 的 A 是 91.8，v10h 是 82.6，看 A 这一行也能分出跑的是哪一版。其余标签的合格带、平凡基线、量化与排查办法见 [eval/README.md](https://github.com/HamoAI/hamo-score-toolkit/blob/main/eval/README.md)。
+
+**这份卷检查的是接线，不是模型质量。** 过关说明你的部署与考卷标签的一致程度和参考值相当、`num_predict` 没有设得过小，走的是工具包自己的提示词、采样与解析器，不是你的。它说明不了你跑的是哪个版本（v10 权重也过得了 v10h 的带），也不检查聊天模板和 `stop`：在 ollama 0.40.13 上，60 道题里缺了这两项的 ollama 标签读数相同。这两项用 `ollama show <tag> --template` 和 `--parameters` 核对。对 v10h 的 GGUF，在 ollama 0.32.5、0.40.12、0.40.13 上，`--template` 打印的是 GGUF 自带的模板，不是 `server/Modelfile` 里的（见 [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)）。在 Docker 服务器上，要在 `server/` 下运行，命令前面加 `docker compose exec ollama`。这份考卷没有咨询师标签：v10h 按 v10 那套标签判卷，所以它与 v10 的分数差说明不了谁对。这套标签与 v10 的训练标签出自同一套教师提示词，对 v10 天然同分布。恒定输出 0.5 在这套标签上就能得 77.9%，所以不要只看总分，还要看 `run_exam.py` 打印的分维成绩与不同读数的种数。
 
 **模块一览**：`hamo_score.prompt`（提示词格式；内置截断作延迟保护：上下文 3 轮 × 200 字、消息 500 字；本页引用的真实终评与旧 B 卷按完整上下文跑，未经这层截断）、`hamo_score.parse`（容错解析）、`hamo_score.client`（两种客户端与 `score_message()` 安全管线；`TransformersClient` 需 `pip install "hamo-score[transformers]"`）、`hamo_score.stress`（参考平滑与状态桶；权重与阈值按 legacy 口径（v7 及更早）的分数定，而 v10 的 A 是另一套口径，v10h 的 A 跟随咨询师复核：让状态桶把关任何事之前，先用你自己的数据核对；不要把 v9 的分数喂给它）、`hamo_score.safety`（`CrisisGate` 中英词表与 AI 披露文案）。
 

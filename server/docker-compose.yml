@@ -5,6 +5,8 @@
 #   v10  hamo-score-0.6b-v10.q8.gguf  6d6f5cd684803a126bbd9615ded100e8a574a2ec6486d579a6a357d6da295490
 #   v9   hamo-score-0.6b-v9.q8.gguf   fa189895962c33390bfbc8e86c6fc77e2b5113cbedf6f5105c38a5bc4eabd05f
 #   v7   hamo-score-0.6b-v7.q8.gguf   fb1018c8a38ad0da573544b827e42f1685e051c688f8de587cbb81ae1275e3ea
+# After a switch the previous GGUF stays in the model-cache volume (about 640 MB each); ollama prunes its own copy. This does no harm.
+# To remove one: docker compose run --rm --no-deps --entrypoint rm setup -f /models/<file>
 # Scores are not comparable across these versions: A changed meaning at v9; B changed at v9 and changed back at v10;
 # v10h's synthetic training labels were re-scored by human counselors engaged by Hamo, and its A and W read lower on average than v10's.
 # With v9 behind this server, do not send current_stress and do not use the stress / energy_state fields of POST /score:
@@ -13,6 +15,9 @@
 # judged against v10's own band in eval/README.md), --labels v9 (v9) or --labels pre_v9 (v7).
 # run_exam.py calls ollama's /api/generate directly and this file publishes only port 8080: see eval/README.md
 # for how to expose the ollama service to the exam.
+# To restart the containers, use `docker compose stop` then `start`. With this file unchanged, `docker compose up -d` restarts nothing: it re-runs `setup`, which warms the model.
+# After you edit this file, run `docker compose up -d`: it recreates the changed services, and `stop` and `start` do not apply the edit.
+# Plain `docker compose restart` can leave `setup` failed and the model cold; the first request then loads the model (a load slower than the 8-second timeout does not finish, see docs/faq.md), and `docker compose up -d` repairs it.
 services:
   ollama:
     image: ollama/ollama:latest

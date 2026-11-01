@@ -38,9 +38,12 @@ A 91.8).
 What a pass covers: the exam always builds the prompt with the toolkit's
 build_prompt(), sends the toolkit's pinned sampling (SAMPLING_OPTIONS:
 temperature 0, repeat_penalty 1.0, top_k 0, top_p 1.0) with every request, and
-parses with parse_scores(). A pass therefore certifies the served weights and
-the server's chat template, num_predict and stop settings, called through the
-toolkit's own prompt, sampling and parser. Request options override the
+parses with parse_scores(). A pass therefore shows that your deployment agrees
+with the exam's labels about as well as the reference does, and that num_predict
+is not too small. It does not show which version you serve (v10 weights also pass v10h's
+band), and it does not check the chat template or stop: on ollama 0.40.13 tags
+without them read the same on 60 questions. Check those with
+`ollama show <tag> --template` and `--parameters`. Request options override the
 Modelfile, so this exam cannot catch a Modelfile that omits repeat_penalty 1.0,
 nor a prompt, sampling setting or parser in your own service — check those
 separately (`ollama show <tag> --parameters`; compare your prompt with
@@ -48,12 +51,16 @@ build_prompt()).
 
 Compare your numbers against eval/README.md. Deviations far outside the
 reference band usually mean the wrong GGUF or the wrong label set, a wrong chat
-template, a server that ignores request options, or an over-aggressive
+template (only on a runtime that applies yours), a server that ignores request
+options, or an over-aggressive
 quantization — not a worse model. The dimension-level number alone is a thin
 check: on the default (v10) labels v7 weights read 83.3% (bf16) / 83.5% (q8),
 less than a point under the band's floor of 84%. Against v10's band their A
 (80.5, floor 86) gives them away. Against v10h's band it does not on the printed
-line: A 80.5 prints as A81%, so read the dimension-level number and B as well
+line: on llama.cpp with Metal the A floor sits above v7 weights (A 80.5 on these
+labels); through ollama on one Apple-silicon Mac (Docker under Colima, arm64 CPU,
+ollama 0.40.13), warmed, v7 reads A 81.0, exactly on the floor. The script prints
+A81% either way, so also check the dimension-level number and B
 (see eval/README.md). On the v9 label set a constant 0.5 already reads 84.9%
 (band 86-92%). The script prints the trivial baselines for the label set in use
 (v10 labels: constant 0.5 -> 77.9%, all zeros -> 68.1%) and warns when the

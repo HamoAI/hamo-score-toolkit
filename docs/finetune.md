@@ -62,7 +62,7 @@ is code, not weights:
 
 | You want to… | Do this instead of fine-tuning |
 |---|---|
-| Catch crisis phrasings specific to your population (slang, dialect, another language) | Extend the gate: `CrisisGate(extra_keywords=[...])`. The gate is deterministic code — extending it is a one-line change and takes effect immediately. **Never** try to fix crisis coverage in the weights. |
+| Catch crisis phrasings specific to your population (slang, dialect, another language) | Extend the gate: `CrisisGate(extra_keywords=[...])`. The gate is deterministic code — extending it is a one-line change and takes effect immediately; on the Docker server the gate code is baked into the `api` image, so it takes effect after `docker compose up -d --build --no-deps api`. **Never** try to fix crisis coverage in the weights. |
 | Different sensitivity in downstream decisions | Tune the deterministic math — the smoothing weights and state-bucket thresholds in [`stress.py`](../src/hamo_score/stress.py) are Apache-2.0 reference code, meant to be adapted. |
 | Disagree with scores on individual messages | Remember scores are per-message signals feeding a `0.8·history + 0.2·message` smoother — single-message noise is absorbed by design. If a *pattern* of disagreement persists, file it with the repo's score-disagreement issue template. We collect these reports as input for human review of the rubric and of future versions. |
 | Slightly different prompt/wording ideas | Don't. The model was trained on exactly one prompt frame ([`build_prompt`](../src/hamo_score/prompt.py)); added instructions and reordered or translated fields are out-of-distribution. |
@@ -306,8 +306,8 @@ GGUF and bf16 safetensors agree — standing in for a teacher label. On the
 same prompt v10 reads B 1.5, v9 reads B 0.0, and v7 reads A 2.5 and B 2.0
 (all as q8): scores do not compare across these versions.)
 
-Build the user content with `hamo_score.build_prompt` so the train-time
-prompt and the serve-time prompt are **byte-identical**. Any drift between
+Build the user content with `hamo_score.build_prompt` so the user content at
+train time and at serve time is **byte-identical**. Any drift between
 the two is silent out-of-distribution at serve time. `build_prompt` also
 trims: the last 3 context turns × 200 chars, a 500-char message. That is the
 toolkit's latency guard, not what our own model saw in training — 36.6% of
@@ -804,7 +804,10 @@ high-withdrawal is the exam's questions with teacher W ≥ 1.5, a wider band
 than the W ≥ 2.5 turns this guide means by the term).
 
 Create the ollama model with the **empty-think template, temperature 0 and
-neutral sampling** — this is the single most common wiring mistake. Use
+neutral sampling**. Sampling is the most common wiring mistake. By default
+ollama 0.32.5, 0.40.12 and 0.40.13 store this template but serve the GGUF's own
+chat template instead (see the [FAQ](faq.md)); keep it unchanged all the same,
+because the published reference used it. Use
 [`server/Modelfile`](../server/Modelfile) as-is (edit the `FROM` line), or see
 the same template inlined in
 [`server/docker-compose.yml`](../server/docker-compose.yml):
@@ -822,7 +825,7 @@ TEMPLATE """<|im_start|>user
 PARAMETER temperature 0
 PARAMETER num_predict 80
 PARAMETER stop <|im_end|>
-# neutral sampling: ollama's default repeat_penalty 1.1 penalizes the score JSON's repeated tokens and pushes scores up from 0
+# neutral sampling: repeat_penalty 1.1, ollama's default through 0.32.9 (1.0 from 0.32.10), penalizes the score JSON's repeated tokens and pushes scores up from 0
 PARAMETER repeat_penalty 1.0
 PARAMETER top_k 0
 PARAMETER top_p 1.0
@@ -833,15 +836,28 @@ ollama create my-score-model -f Modelfile
 ```
 
 The last three lines are not cosmetic, and the first of them is measured.
-With ollama's default `repeat_penalty 1.1` in place of 1.0, v10 q8 on the old
+With `repeat_penalty 1.1`, ollama's default through 0.32.9 (1.0 from 0.32.10),
+in place of 1.0, v10 q8 on the old
 B exam (legacy key; llama.cpp with Metal) went from 3/104 fabrications (2.9%)
 to 15/104 (14.4%) and from 2 sign flips to 4. The earlier measurements we
 published, on other versions and occasions, pushed in the same direction
 ([`eval/README.md`](../eval/README.md)): keep all three lines.
 
+To see which template a tag serves, run `ollama show <tag> --template`. For the
+v10h GGUF on ollama 0.32.5, 0.40.12 and 0.40.13 it prints the GGUF's Jinja
+template, and on 0.40.13 `/api/show` also reports
+`template_source: gguf_chat_template`. Nothing is pre-filled then: on 0.40.13
+the v10h, v10, v9 and v7 GGUFs each wrote an empty `<think>` block themselves,
+then the JSON.
+`parse_scores()` handles that; a bare `json.loads` on the response fails. ollama
+decides this per GGUF, and with `OLLAMA_GO_TEMPLATE=1` it serves the Modelfile
+template, so check your own weights the same way.
+
 In production, set `keep_alive=-1` and send one warm-up request after every
 restart (the toolkit's `OllamaClient` already sends `keep_alive=-1` per
-request).
+request). Send the warm-up with a long timeout, not through an 8-second
+client: ollama aborts a load when the client disconnects, so a load slower
+than the timeout never finishes (reproduced only under an artificial CPU cap).
 
 Compare the served model with the evaluated one, item by item, before you
 trust either: the same GGUF can score differently in another runtime, which
@@ -853,11 +869,21 @@ earlier run with it on, the default in ollama 0.32.5, gave 95 and 98 — see
 the [FAQ](faq.md)); and the serving check specified in the draft protocol
 (138 synthetic items of the old exams, with the toolkit's trimming; run on
 2026-10-05, two days after the verdict) reproduced Metal's sign-flip and
-W-floor counts. We make no
-cross-runtime claim beyond these; v10's gates ran on Metal. So did v10h's
+W-floor counts. v10's gates ran on Metal. So did v10h's
 checks. On that server v10h reproduced the sign-flip and W-floor counts of
 Metal on the same 138 items, and matched llama.cpp on 96 of 100 synthetic
-items exactly (all 100 within ±0.5).
+items exactly (all 100 within ±0.5). On 2026-10-31 and 11-01 we compared v10h
+with llama.cpp with Metal on the 195 questions of the self-check exam (below),
+on one Apple-silicon Mac (Docker under Colima, arm64 CPU, ollama 0.40.13), with
+the prompt cache off. With the model warmed, the five-score read-out was
+identical on 184 and within ±0.5 on all five dimensions on all 195; from a
+fresh load, on 182 and 194. One request before the first question gave the
+warmed reading. The two states differ on 11 of the 195 answers, one of them by
+more than ±0.5. On 2026-11-01, repeat passes of the same prompts in the same
+order, from the same state, gave the same answers; one message sent twice in a
+row need not. The
+cause was not investigated. We make no cross-runtime claim beyond these, and we
+have no x86 run.
 
 **Then take the exam.** The toolkit ships a deployment self-check — 195
 synthetic teacher-labeled questions plus 10 handwritten crisis-gate cases:
@@ -879,16 +905,17 @@ deployment keeps v10's band on the same labels: the same lines with A ≥ 86
   both name, because there are no counselor labels for this exam;
   `--labels v9` (rubric-v8 A, crisp B)
   and `--labels pre_v9` (old A, legacy B). Grade a v9 or v7 deployment
-  against its own set (bands in `eval/README.md`). The A floor sits above v7
-  weights (A 80.5 on the v10 labels), but the script prints whole percents (v7
-  shows `A81%`), so also check the dimension-level number and B
-  (`eval/README.md`).
-- **The exam is in-distribution by construction, so it certifies wiring, not
+  against its own set (bands in `eval/README.md`). On llama.cpp with Metal the
+  A floor sits above v7 weights (A 80.5 on the v10 labels); through ollama on
+  one Apple-silicon Mac (Docker under Colima, arm64 CPU, ollama 0.40.13), warmed, v7 reads A 81.0, exactly on the floor. The script prints `A81%` either
+  way, so also check the dimension-level number and B (`eval/README.md`).
+- **The exam is in-distribution by construction, so it checks wiring, not
   model quality.** Its labels come from the same teacher prompts as v10's
   training labels. And it uses the toolkit's own prompt builder and parser
   and pins the sampling options on every request, which overrides the
   Modelfile: it cannot catch a Modelfile that omits `repeat_penalty 1.0`, nor
-  a different prompt, sampling setting or parser in your own service. Read
+  a different prompt, sampling setting or parser in your own service. So a
+  pass shows that your deployment agrees with the exam's labels about as well as the reference does, and that `num_predict` is not too small. It does not show which version you serve (v10 weights also pass v10h's band), and it does not check the chat template or `stop`: on ollama 0.40.13 tags without them read the same on 60 questions. Check those with `ollama show <tag> --template` and `--parameters`. Read
   the score against the trivial baselines `run_exam.py` prints: on the v10
   labels, always answering 0.5 already reaches 77.9% dimension-level, and
   always answering 0 reaches 68.1%.
@@ -1290,7 +1317,8 @@ llama.cpp + Metal。先立框架：它是**测量仪器**——
 ### 一、先想清楚要不要微调
 
 多数需求不需要动权重：人群特有的危机说法 → `CrisisGate(extra_keywords=[...])`
-一行扩词表；下游敏感度 → 改 `stress.py` 里的平滑与分桶阈值；个别句子评分不服 →
+一行扩词表（Docker 服务器上闸门代码打包在 `api` 镜像里，要运行
+`docker compose up -d --build --no-deps api` 才生效）；下游敏感度 → 改 `stress.py` 里的平滑与分桶阈值；个别句子评分不服 →
 分数要经 `0.8·历史 + 0.2·本句` 平滑，单句噪声会被吸收，成规律的分歧走仓库的
 「评分分歧」issue 模板——我们收集这些报告，供人工复核口径与后续版本时参考。
 
@@ -1404,7 +1432,7 @@ LLM judge 用于任何触人环节：与持牌专业人员的 kappa ≥ 0.6 才�
 ### 四、训练数据格式
 
 mlx-lm 聊天格式 JSONL，user 内容**必须**用 `hamo_score.build_prompt` 构造
-（训练与推理提示词逐字节一致；工具包安装：`pip install hamo-score`）；assistant
+（训练与推理的 user 内容逐字节一致；工具包安装：`pip install hamo-score`）；assistant
 内容是单个 JSON 对象：五键、一位小数、吸附到 0.5 网格（教师标签不一定在网格上），
 无任何多余文字。`build_prompt` 自带截短（只留最后 3 轮上下文、每轮 200 字，消息
 500 字）：这是工具包的延迟护栏，不是我们的模型训练时见到的样子——v10 训练行里有
@@ -1594,13 +1622,21 @@ GGUF，而从下载的仓库副本转换，310 张张量相同，文件头元数
 表格（默认按 v10 标签判；v9 的档位加 `--labels v9`，v7 系的加 `--labels pre_v9`；脚本里说的
 高退缩题是教师 W ≥ 1.5 的题，比本指南所说的高退缩轮次（参照 W ≥ 2.5）范围更宽）。
 
-**建模与采样。** `ollama create` 时模板必须带**空 `<think>` 块 + temperature 0 +
+**建模与采样。** `ollama create` 时模板带**空 `<think>` 块 + temperature 0 +
 中性采样**（`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`）；照抄 `server/Modelfile`
-（只改 `FROM` 一行）。ollama 默认的 repeat_penalty 1.1 会把分数从 0 往上推，这有
+（只改 `FROM` 一行）。ollama 0.32.5、0.40.12、0.40.13 默认会存下这段模板，但实际用 GGUF
+自带的聊天模板（见 [FAQ](faq.md)）；`TEMPLATE` 段仍请原样保留，已发布的参考读数用的就是它。
+要看某个 ollama 标签实际用的模板，运行 `ollama show <tag> --template`：对 v10h 的 GGUF，在这三个
+版本上它打印 GGUF 的 Jinja 模板，0.40.13 的 `/api/show` 还会报
+`template_source: gguf_chat_template`。这时不会预填：在 0.40.13 上，v10h、v10、v9、v7 的 GGUF 都自己
+先写一个空的 `<think>` 块，再写 JSON；`parse_scores()` 能处理，直接 `json.loads` 会失败。ollama
+按 GGUF 决定用哪个模板，设 `OLLAMA_GO_TEMPLATE=1` 时用 Modelfile 的模板，所以你自己的权重也要这样核对。`repeat_penalty 1.1`（ollama 0.32.9 及以前的默认值，0.32.10 起为
+1.0）会把分数从 0 往上推，这有
 实测：换成 1.1 后，v10 q8 在旧 B 卷（legacy 答案；llama.cpp + Metal）上的造分从
 3/104（2.9%）升到 15/104（14.4%），符号翻转从 2 条变成 4 条；此前公布过的实测
 方向都相同（见 [`eval/README.md`](../eval/README.md)）。生产设 `keep_alive=-1`、
-重启后预热一发。
+重启后预热一发。预热请求要用长超时，不要走 8 秒的客户端：客户端断开时 ollama 会中止
+加载，比超时更慢的加载永远完不成（只在人为限制 CPU 时复现过）。
 
 **把「服务出来的模型」和「评测用的模型」逐题对一遍**：同一个 GGUF 换个运行环境
 可能打出不同的分。v10 对一台跑 ollama 的 ARM CPU 服务器做过两项核对：100 道
@@ -1608,9 +1644,15 @@ GGUF，而从下载的仓库副本转换，310 张张量相同，文件头元数
 （关掉服务端提示词缓存后测得；此前开着缓存——ollama 0.32.5 的默认设置——跑的一次
 是 95 道和 98 道，见 [FAQ](faq.md)）；方案草案写定的服务端核对（138 道旧考卷的合成题，按
 工具包规则截短；2026-10-05 才跑，在判定两天之后）复现了 Metal 上的符号翻转数与
-W 达标数。此外不作跨运行环境的声明；v10 的闸门是在 Metal 上跑的。v10h 的检查也在
+W 达标数。v10 的闸门是在 Metal 上跑的。v10h 的检查也在
 Metal 上跑；在那台服务器上，它在同样 138 道题上复现了 Metal 的符号翻转数与 W 达标数，
-另抽的 100 道合成题里 96 道与 llama.cpp 完全相同，100 道都在 ±0.5 内。
+另抽的 100 道合成题里 96 道与 llama.cpp 完全相同，100 道都在 ±0.5 内。2026-10-31 与 11-01 我们
+在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13），关掉提示词
+缓存，用自检卷（见下）的 195 道题把 v10h 与 llama.cpp + Metal 比了一遍：模型已预热时，
+五维读数完全相同的 184 道，五维都在 ±0.5 内的 195 道；从刚加载的状态开始是 182 道和 194 道。第一题
+之前先发一条请求，得到的就是预热后的读数。两种状态有 11 道读数不同，其中一道相差超过
+±0.5。2026-11-01 从同一状态出发、同样顺序的同一批提示词，重跑得到相同的读数；同一条消息连发两次则不一定。
+原因没有调查。此外不作跨运行环境的声明，也没有 x86 上的记录。
 
 **最后交卷**：`python eval/run_exam.py --model 你的模型`，对照 `eval/README.md`
 的参考带。默认标签上 v10h 的带：JSON ≥ 99%、维度级 84–90%、各维 ≥ 75% 且 A ≥ 81、
@@ -1621,12 +1663,13 @@ Metal 上跑；在那台服务器上，它在同样 138 道题上复现了 Metal
 - **三套标签**：v10 的标签（A 口径 v8、legacy B）是默认，`--labels v10h` 和
   `--labels v10` 指的都是它，因为这份考卷没有咨询师标签；另有 `--labels v9`（A
   口径 v8、crisp B）、`--labels pre_v9`（旧 A、legacy B）。部署 v9 或 v7 的，按它
-  自己那一套判。A 的下限高于 v7 权重（在 v10 标签上 A 为 80.5），但脚本按整数百分比
-  打印（v7 显示 `A81%`），所以还要看维度级和 B（见 `eval/README.md`）。
-- **考卷天然同分布，验证的是接线，不是模型质量。** 它的标签与 v10 的训练标签出自同一套
+  自己那一套判。在 llama.cpp + Metal 上，A 的下限高于 v7 权重（在 v10 标签上 A 为
+  80.5）；在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13）经 ollama，模型已预热时，v7 的 A 是 81.0，正好压线。两种情况脚本都打印
+  `A81%`，所以还要看维度级和 B（见 `eval/README.md`）。
+- **考卷天然同分布，检查的是接线，不是模型质量。** 它的标签与 v10 的训练标签出自同一套
   教师提示词。它用工具包自己的提示词构造与解析器，每次请求都带固定的采样参数
   （优先于 Modelfile）——所以查不出 Modelfile 漏写 `repeat_penalty 1.0`，也查不出
-  你自己服务里用了别的提示词、采样设置或解析器。分数要对着平凡基线读：在 v10
+  你自己服务里用了别的提示词、采样设置或解析器。过关说明你的部署与考卷标签的一致程度和参考值相当、`num_predict` 没有设得过小。它说明不了你跑的是哪个版本（v10 权重也过得了 v10h 的带），也不检查聊天模板和 `stop`：在 ollama 0.40.13 上，60 道题里缺了这两项的 ollama 标签读数相同。这两项用 `ollama show <tag> --template` 和 `--parameters` 核对。分数要对着平凡基线读：在 v10
   标签上，永远输出 0.5 的部署维度级就有 77.9%，永远输出 0 的有 68.1%。
 - 若你的微调实质改变了评分分布，随包考卷的标签已不公允——用你的合格教师按同样
   形制重出一份（约 200 题合成、零真实数据），并查它与训练语料的重叠（我们的 195

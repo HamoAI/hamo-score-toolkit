@@ -1,8 +1,12 @@
 """Reference scoring server — the license-compliant integration pattern as a service.
 
 POST /score        {message, history?, current_stress?, quadrant?}
-                   → {crisis, scores, stress, energy_state, latency_ms}
-GET  /healthz      → model reachability probe
+                   → {crisis, scores, latency_ms}, plus {stress, energy_state}
+                     when current_stress is sent and scores is not null.
+                     scores is null on a gate hit, or if the reply does not parse.
+GET  /healthz      → sends the model a short probe and reports ok on any non-empty
+                     reply: it shows the model answers, not that a score parses.
+                     Always HTTP 200: read the ok field
 
 The pipeline is gate → score → smooth → bucket. Crisis-gated requests return
 ``{"crisis": {"triggered": true, ...}}`` and are NEVER sent to the model —

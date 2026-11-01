@@ -48,8 +48,9 @@ def test_crisis_gate_short_circuits():
 def test_ollama_client_pins_neutral_sampling():
     """Every request must carry neutral sampling, whatever the server's Modelfile says.
 
-    Regression guard: ollama's default repeat_penalty 1.1 raised the fabrication
-    rate in every version we measured (v10 q8: 2.9% -> 14.4%). Intercepts the
+    Regression guard: repeat_penalty 1.1, ollama's default through 0.32.9 (1.0
+    from 0.32.10), raised the fabrication rate in every version we measured
+    (v10 q8: 2.9% -> 14.4%). Intercepts the
     real HTTP payload OllamaClient sends.
     """
     import json

@@ -14,16 +14,34 @@ against reference labels (from the production rubric's LLM scorer, with human
 corrections on 5 of the 453 turns; these are not counselor scores) and not
 distributed. The other exams are synthetic.
 
-**Why must the template contain an empty `<think>` block?**
-The student is a Qwen3 base fine-tuned with thinking disabled; the template
-pre-fills an empty think block so the model goes straight to the JSON. Without
-it the model may emit think text, and under the `num_predict 80` cap the JSON
-can be cut off — expect parse failures, not just latency. Copy the `TEMPLATE`
-block of [`server/Modelfile`](../server/Modelfile) unchanged.
+**Why does the template contain an empty `<think>` block?**
+The model was trained on chat text whose assistant turn is an empty think block
+followed by the JSON. The `TEMPLATE` in [`server/Modelfile`](../server/Modelfile)
+pre-fills that block, and the published q8 reference used it through llama.cpp.
+Copy it unchanged.
+
+By default ollama 0.32.5, 0.40.12 and 0.40.13 store this template but serve the
+GGUF's own chat template instead (`ollama show <tag> --template` prints it; on
+0.40.13 `/api/show` reports `template_source: gguf_chat_template`). Nothing is
+pre-filled then: the model writes the empty block itself, then the JSON, and the
+response text starts with `<think>`. `parse_scores()` handles that; a bare
+`json.loads` on the response fails.
+
+Measured on 2026-10-31 and 11-01 on one Apple-silicon Mac (Docker under Colima,
+arm64 CPU, ollama 0.40.13): on the 195 exam questions and on 1,415 other distinct
+synthetic prompts no answer had think text and none was cut off at
+`num_predict 80`. `"think": false` in the request, or `OLLAMA_GO_TEMPLATE=1` on
+the server, pre-fills the block, and the response starts with `{`. On the 195
+questions, with the model warmed and the prompt cache off, the two paths agreed
+exactly on 189 and within ±0.5 on all 195 (86.7% without the pre-filled block,
+86.4% with it). With `OLLAMA_GO_TEMPLATE=1` and a `TEMPLATE` that has no think
+block, the model again wrote the block itself: JSON 100%, 86.7%. The toolkit's
+client does not send `think`.
 
 **Why temperature 0 — and why must I also neutralise `repeat_penalty`?**
-Scoring is measurement; sampling noise is measurement error. And **ollama
-defaults to `repeat_penalty 1.1`**, while this model's output —
+Scoring is measurement; sampling noise is measurement error. And
+**`repeat_penalty 1.1`**, ollama's default through 0.32.9 (1.0 from 0.32.10),
+does harm, because this model's output —
 `{"A": 0.0, "W": 0.0, "E": 0.0, "H": 0.0, "B": 0.0}` — is repetitive by
 design: penalising repeated tokens pushes scores away from 0, i.e. fabricates
 signal, with no error. Measured on v10 q8 with the old B exam (300 questions,
@@ -44,24 +62,51 @@ them: check with `ollama show <tag> --parameters`.
 **The first request after startup is slow / times out.**
 Cold start. Send one warm-up request after every model (re)start and keep
 `keep_alive=-1` (the toolkit's client sets it per request; client and
-reference server default to an 8-second hard timeout). If later requests are
+reference server default to an 8-second hard timeout). Send the warm-up with a
+long timeout, not through an 8-second client: ollama aborts a load when the
+client disconnects, so a load slower than the timeout never finishes
+(reproduced only under an artificial CPU cap). If later requests are
 still slow, the usual cost is prompt prefill on a slow CPU — check the
 trimming guards.
 
+If you limit the ollama container with `cpuset`, set `LLAMA_ARG_THREADS` to the
+number of CPUs. On one Apple-silicon Mac (Docker under Colima, arm64 CPU, ollama
+0.40.13), limited to 2 of the VM's 4 CPUs and 1500 MiB, llama-server otherwise
+kept 4 threads: warm-up took 125 s against about 3 s, and `/score` was still
+returning 500 when the run was stopped more than 400 s later. With
+`LLAMA_ARG_THREADS=2` the stack was healthy in 11 s.
+
 **The ollama process keeps growing in memory on a small machine.**
-On ollama 0.32.5 the bundled llama-server keeps a host-memory prompt cache
-(default limit 8 GiB) that grows with every distinct prompt: on a 4 GB machine
-we saw the process grow from 1.3 GB to 3.3 GB over 100 distinct prompts.
+On ollama 0.32.5 and 0.40.13 the bundled llama-server keeps a host-memory
+prompt cache, on by default (limit 8 GiB), that grows with every distinct
+prompt: on 0.32.5 on a 4 GB machine we saw the process grow from 1.3 GB to
+3.3 GB over 100 distinct prompts.
 Setting `LLAMA_ARG_CACHE_RAM=0` in the ollama service environment stopped the
 growth (1,277 → 1,294 MB over the same 100 prompts) with median latency
-unchanged. The reference `server/docker-compose.yml` does not set it.
+unchanged. The reference `server/docker-compose.yml` on `main` has set it since
+2026-10-31; the file at the `v0.4.0` tag does not.
+
+Measured on 2026-10-31 on one Apple-silicon Mac (Docker under Colima, arm64 CPU,
+ollama 0.40.13), with short one-line synthetic messages through `POST /score`: 100 distinct prompts grew the process by 975 MB with the
+cache on and by 2.3 MB with it off, with the median request time unchanged.
+Growth depends on prompt length. Under a 4 GiB memory limit, 2 CPUs and `LLAMA_ARG_THREADS=2`, with the cache on, a
+serial pass through `POST /score` had the runner killed for memory at message
+182, and a separate exam pass crashed with HTTP 500. With the same limits and the
+cache off, 195 of 195 were served, nothing was killed, the exam read 86.5%, and
+the ollama container peaked at about 1.3 GiB. These are container limits, not
+real small machines.
 
 **My output isn't valid JSON.**
 `parse_scores()` returns `None`; treat it as "skip this message" (the smoothed
 state stays unchanged) — never crash, never guess. Above ~1% of messages,
 suspect your wiring before the model (v10h q8: 0 unparseable outputs across the
-six acceptance exams). Check the empty think template, temperature 0 and
-`num_predict ≥ 80`, then run `eval/run_exam.py`.
+six acceptance exams). Check temperature 0, `num_predict ≥ 80` and that the
+prompt comes from `build_prompt()`: on ollama 0.40.13 `num_predict 20` and one
+hand-written prompt each gave JSON 0%. On ollama 0.32.5, 0.40.12 and 0.40.13 a
+response that starts with an empty think block is normal: `parse_scores()`
+handles it, a bare `json.loads` does not. Then run `eval/run_exam.py`; to run
+it against the Docker server, first publish the ollama port as
+[eval/README.md](../eval/README.md) describes.
 
 **Which languages does it support?**
 Chinese-primary. By the latest message of each of the 20,787 v10 training
@@ -233,15 +278,14 @@ The self-check exam is 195 synthetic questions, and there are no counselor
 labels for it: v10h is graded on v10's label set, so a gap against v10's number
 says nothing about which is right. Those labels come from the same teacher
 prompts as v10's training labels, so for v10 the exam is in-distribution by
-construction. Either way a pass certifies *wiring* (the served weights and the
-server's template, `num_predict` and stop, through the toolkit's own prompt,
-sampling and parser, not yours), not model quality. The v10h reference is 86.7%
+construction. Either way a pass checks *wiring*, not model quality: it shows that your deployment agrees with the exam's labels about as well as the reference does, and that `num_predict` is not too small, through the toolkit's own prompt, sampling and parser, not yours. It does not show which version you serve (v10 weights also pass v10h's band), and it does not check the chat template or `stop`: on ollama 0.40.13 tags without them read the same on 60 questions. Check those with `ollama show <tag> --template` and `--parameters`.
+The v10h reference is 86.7%
 for the shipped q8 and 86.8% for bf16; the pass band is dimension-level 84–90%,
 each dimension ≥ 75%, A ≥ 81, JSON validity ≥ 99%, crisis gate 10/10. Do not
 read 87% as accuracy: answering 0.5 on every dimension already scores 77.9% on
 these labels. Under the band, check which weights and labels you are running:
-the A floor sits above v7 weights (A 80.5 on these labels), but the script
-prints whole percents (v7 shows `A81%`), so also check the dimension-level
+on llama.cpp with Metal the A floor sits above v7 weights (A 80.5 on these labels); through ollama on one Apple-silicon Mac (Docker under Colima, arm64 CPU, ollama 0.40.13), warmed, v7 reads A 81.0, exactly on the floor. The
+script prints `A81%` either way, so also check the dimension-level
 number and B; a v9 or v7 deployment needs `--labels v9` or `--labels pre_v9`.
 A v10 deployment uses `--labels v10` and keeps its own band (A ≥ 86%, reference
 87.3%). Details:
@@ -289,17 +333,25 @@ of the rubric and of future versions.
 
 对应工具包 0.4.0，参考服务器跑的是 **v10h**。除另有说明，数字都测于随包 q8 GGUF：llama.cpp + Metal（Apple M1 Pro），温度 0，`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`；v7、v9、v10 的数字是各自随包的 q8 GGUF 在同样条件、同一份考卷上跑的。「bf16」指 safetensors 经 MLX 运行。验收考卷的数字用每题的完整上下文，不经 `build_prompt` 截短；自检卷和 ARM 服务器上的核对则经过截短。「真实终评」是 453 轮真实对话，来自三位知情同意的内部员工，已假名化，按参照标签（出自按生产口径打分的 LLM 评分器，其中 5 轮经人工修正；不是咨询师的分数）判卷，不对外分发。其余考卷都是合成的。
 
-**为什么模板必须带空 `<think>` 块？** 学生是关闭思考训练的 Qwen3，模板预填一个空 think 块，让它直接输出 JSON。没有它，模型可能先「想」一段；在 `num_predict 80` 的上限下 JSON 可能被截断——你看到的会是解析失败，不只是变慢。请原样照抄 [`server/Modelfile`](../server/Modelfile) 的 `TEMPLATE` 段。
+**为什么模板带空 `<think>` 块？** 模型的训练文本里，assistant 这一轮是一个空 think 块加 JSON。[`server/Modelfile`](../server/Modelfile) 的 `TEMPLATE` 预填了这个块，已发布的 q8 参考读数经 llama.cpp 用的就是它。请原样照抄。
 
-**为什么温度必须 0，还必须中性化 `repeat_penalty`？** 评分是测量，采样噪声就是测量误差。而 **ollama 默认 `repeat_penalty 1.1`**，本模型的输出 `{"A": 0.0, "W": 0.0, "E": 0.0, "H": 0.0, "B": 0.0}` 天然高度重复——惩罚重复 token 等于把分数从 0 往上推，凭空造出信号，还不报错。在 v10 q8 上测得：旧 B 卷（300 题，legacy 答案）上只把 1.0 换成 1.1，造分（没有边界的题与低臂题被打成 B ≥ 1.0）从 3/104（2.9%）升到 15/104（14.4%），B 符号翻转（标准答案 B 为 0 的题被打成 ≥ 2.0）在 93 题中从 2 条变成 4 条。v6.1、v7、v9 当时测出来也是往这个方向推（它们当时公布的数字见 [eval/README.md](../eval/README.md)）。
+ollama 0.32.5、0.40.12、0.40.13 默认会存下这段模板，但实际用 GGUF 自带的聊天模板（`ollama show <tag> --template` 打印的就是它；0.40.13 的 `/api/show` 报告 `template_source: gguf_chat_template`）。这时不会预填：模型自己写出空 think 块，再写 JSON，响应文本以 `<think>` 开头。`parse_scores()` 能处理；对响应直接 `json.loads` 会失败。
+
+2026-10-31 与 11-01 在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13）实测：195 道考题和另外 1,415 条不同的合成提示词，没有一条回答带思考文字，也没有一条在 `num_predict 80` 处被截断。请求里带 `"think": false`，或服务端设 `OLLAMA_GO_TEMPLATE=1`，就会预填这个块，响应以 `{` 开头。模型已预热、提示词缓存关闭时，在这 195 题上，两条路径有 189 题完全一致，全部在 ±0.5 内（不预填 86.7%，预填 86.4%）。设了 `OLLAMA_GO_TEMPLATE=1` 而 `TEMPLATE` 里没有 think 块时，模型同样自己写出这个块：JSON 100%，86.7%。工具包的客户端不发 `think`。
+
+**为什么温度必须 0，还必须中性化 `repeat_penalty`？** 评分是测量，采样噪声就是测量误差。而 **`repeat_penalty 1.1`**（ollama 0.32.9 及以前的默认值，0.32.10 起为 1.0）有害：本模型的输出 `{"A": 0.0, "W": 0.0, "E": 0.0, "H": 0.0, "B": 0.0}` 天然高度重复——惩罚重复 token 等于把分数从 0 往上推，凭空造出信号，还不报错。在 v10 q8 上测得：旧 B 卷（300 题，legacy 答案）上只把 1.0 换成 1.1，造分（没有边界的题与低臂题被打成 B ≥ 1.0）从 3/104（2.9%）升到 15/104（14.4%），B 符号翻转（标准答案 B 为 0 的题被打成 ≥ 2.0）在 93 题中从 2 条变成 4 条。v6.1、v7、v9 当时测出来也是往这个方向推（它们当时公布的数字见 [eval/README.md](../eval/README.md)）。
 
 请始终设置 `repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`。`server/Modelfile` 和 `server/docker-compose.yml` 已写好，工具包的 `OllamaClient` 也在每次请求里带上（请求参数优先于 Modelfile）；自己写的客户端若不随请求带上这三项，就只剩 Modelfile 这一层；Modelfile 也漏写，就一层都没有。自检卷走的是工具包的客户端，查不出漏写这三项的 Modelfile——请用 `ollama show <tag> --parameters` 核对。
 
-**启动后第一条请求慢/超时？** 冷启动。每次（重新）加载模型后先预热一发，并保持 `keep_alive=-1`（工具包客户端每次请求都带；客户端与参考服务器默认 8 秒硬超时）。之后仍慢，通常是慢 CPU 上的 prefill 成本——检查截断护栏。
+**启动后第一条请求慢/超时？** 冷启动。每次（重新）加载模型后先预热一发，并保持 `keep_alive=-1`（工具包客户端每次请求都带；客户端与参考服务器默认 8 秒硬超时）。预热请求要用长超时，不要走 8 秒的客户端：客户端断开时 ollama 会中止加载，比超时更慢的加载永远完不成（只在人为限制 CPU 时复现过）。之后仍慢，通常是慢 CPU 上的 prefill 成本——检查截断护栏。
 
-**小内存机器上，ollama 进程的内存越涨越高？** ollama 0.32.5 自带的 llama-server 有一个放在主机内存里的提示词缓存（默认上限 8 GiB），每来一条不同的提示词就多占一份：我们在一台 4 GB 的机器上看到，100 条不同的提示词让进程从 1.3 GB 涨到 3.3 GB。在 ollama 服务的环境变量里设 `LLAMA_ARG_CACHE_RAM=0` 后不再增长（同样 100 条，1,277 → 1,294 MB），延迟中位数不变。参考的 `server/docker-compose.yml` 没有设这一项。
+用 `cpuset` 限制 ollama 容器时，把 `LLAMA_ARG_THREADS` 设成 CPU 数。在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13），限制到虚拟机 4 个 CPU 中的 2 个和 1500 MiB 内存时，不设的话 llama-server 仍是 4 个线程：预热用了 125 秒（不限制时约 3 秒），运行超过 400 秒后停掉时 `/score` 仍在返回 500。设 `LLAMA_ARG_THREADS=2` 后 11 秒就绪。
 
-**输出不是合法 JSON？** `parse_scores()` 返回 `None`，按「跳过本句」处理（平滑后的状态不变）——不崩溃、不瞎猜。超过约 1% 时，先怀疑接线而不是模型（v10h q8 在六份验收考卷上无法解析的输出合计 0 条）。检查空 think 模板、温度 0、`num_predict ≥ 80`，再跑 `eval/run_exam.py`。
+**小内存机器上，ollama 进程的内存越涨越高？** ollama 0.32.5 和 0.40.13 自带的 llama-server 有一个放在主机内存里的提示词缓存，默认开启（上限 8 GiB），每来一条不同的提示词就多占一份：在 0.32.5 上，我们在一台 4 GB 的机器上看到，100 条不同的提示词让进程从 1.3 GB 涨到 3.3 GB。在 ollama 服务的环境变量里设 `LLAMA_ARG_CACHE_RAM=0` 后不再增长（同样 100 条，1,277 → 1,294 MB），延迟中位数不变。`main` 上参考的 `server/docker-compose.yml` 自 2026-10-31 起设了这一项；`v0.4.0` 标签里的文件没有设。
+
+2026-10-31 在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13）用较短的单行合成消息（经 `POST /score`）实测：100 条不同的提示词，缓存开着时进程涨了 975 MB，关掉时涨了 2.3 MB，请求耗时中位数不变。增长幅度取决于提示词长度。在 4 GiB 内存限制、2 个 CPU、`LLAMA_ARG_THREADS=2` 下，缓存开着时，一遍串行的 `POST /score` 在第 182 条消息时运行进程因内存不足被杀，另一遍考卷因 HTTP 500 中断。同样的限制下关掉缓存，195 条全部返回，没有进程被杀，考卷 86.5%，ollama 容器峰值约 1.3 GiB。这些是容器限制，不是真正的小内存机器。
+
+**输出不是合法 JSON？** `parse_scores()` 返回 `None`，按「跳过本句」处理（平滑后的状态不变）——不崩溃、不瞎猜。超过约 1% 时，先怀疑接线而不是模型（v10h q8 在六份验收考卷上无法解析的输出合计 0 条）。检查温度 0、`num_predict ≥ 80`，以及提示词是否出自 `build_prompt()`：在 ollama 0.40.13 上，`num_predict 20` 和一段手写的提示词都让 JSON 合法率降到 0%。在 ollama 0.32.5、0.40.12、0.40.13 上，响应以空 think 块开头是正常的：`parse_scores()` 能处理，直接 `json.loads` 不行。然后跑 `eval/run_exam.py`；要考 Docker 服务器，先按 [eval/README.md](../eval/README.md) 发布 ollama 的端口。
 
 **支持哪些语言？** 中文为主。按 v10 训练集 20,787 行每行的最新消息统计（v10h 的 20,001 行是这些行去掉留出和移除的部分）：中文 76.0%、英文 13.1%、中英混杂 10.9%。我们没有公布 v10 或 v10h 分语言的准确率；其他语言未测——那是[微调指南](finetune.md)的事。
 
@@ -345,7 +397,7 @@ v10h 和 v10 每一行都在预注册上限之内，在自我消融题池上远�
 
 **为什么我考出约 87%，而技术档案写的是 82.8%？** 两张不同的卷子、两套不同的标签。技术档案的 82.8%（v10h，随包 q8，五维平均）出自真实终评，那套参照标签用的是旧的 A 口径：v10h 在那张卷上的 A（319/453，±0.5 内 70.4%）衡量的是 A 离那套口径挪动了多远，不是准确率。
 
-自检卷是 195 道合成题，它没有咨询师标签：v10h 按 v10 那套标签判卷，所以它与 v10 的分数差说明不了谁对。这套标签与 v10 的训练标签出自同一套教师提示词，对 v10 按构造就是同分布。无论哪一版，过关认证的都是**接线**（你部署的权重，服务端的模板、`num_predict` 与 stop；走的是工具包自己的提示词、采样与解析器，不是你的），不是模型水平。v10h 的参考值：随包 q8 86.7%，bf16 86.8%；合格带：维度级 84–90%、每一维 ≥ 75%、A ≥ 81、JSON 合法率 ≥ 99%、危机闸门 10/10。别把 87% 读成准确率：每一维都答 0.5，在这套标签上就有 77.9%。低于合格带时，先核对跑的是哪份权重、哪套标签：A 的下限高于 v7 权重（这套标签上 A 为 80.5），但脚本按整数百分比打印（v7 显示 `A81%`），所以还要看维度级和 B；部署的是 v9 或 v7，要加 `--labels v9` 或 `--labels pre_v9`；部署 v10 的用 `--labels v10`，沿用它自己的合格带（A ≥ 86%，参考值 87.3%）。详见 [eval/README.md](../eval/README.md)。
+自检卷是 195 道合成题，它没有咨询师标签：v10h 按 v10 那套标签判卷，所以它与 v10 的分数差说明不了谁对。这套标签与 v10 的训练标签出自同一套教师提示词，对 v10 按构造就是同分布。无论哪一版，这份卷检查的都是**接线**，不是模型水平：过关说明你的部署与考卷标签的一致程度和参考值相当、`num_predict` 没有设得过小，走的是工具包自己的提示词、采样与解析器，不是你的。它说明不了你跑的是哪个版本（v10 权重也过得了 v10h 的带），也不检查聊天模板和 `stop`：在 ollama 0.40.13 上，60 道题里缺了这两项的 ollama 标签读数相同。这两项用 `ollama show <tag> --template` 和 `--parameters` 核对。v10h 的参考值：随包 q8 86.7%，bf16 86.8%；合格带：维度级 84–90%、每一维 ≥ 75%、A ≥ 81、JSON 合法率 ≥ 99%、危机闸门 10/10。别把 87% 读成准确率：每一维都答 0.5，在这套标签上就有 77.9%。低于合格带时，先核对跑的是哪份权重、哪套标签：在 llama.cpp + Metal 上，A 的下限高于 v7 权重（这套标签上 A 为 80.5）；在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13）经 ollama，模型已预热时，v7 的 A 是 81.0，正好压线。两种情况脚本都打印 `A81%`，所以还要看维度级和 B；部署的是 v9 或 v7，要加 `--labels v9` 或 `--labels pre_v9`；部署 v10 的用 `--labels v10`，沿用它自己的合格带（A ≥ 86%，参考值 87.3%）。详见 [eval/README.md](../eval/README.md)。
 
 **能用自己的数据微调吗？** 能——[微调指南](finetune.md)按代讲完整打法，数据红线靠前；拒收的六代（v5、v6、v8、v8.1、v9L、v10r）和没过预注册闸门、凭创始人决定发布的两代（v9、v10）都写在里面。微调出的权重仍受 HAMO-RAIL-S 约束（见指南的许可证一节）。
 

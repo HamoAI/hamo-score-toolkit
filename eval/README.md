@@ -1,29 +1,36 @@
 # 自检考卷 · Self-Check Exam
 
-部署后跑这份考卷，核对你的接线是否复现官方读数。**它验证的是接线，不是模型质量；卷里没有真实对话的轮次，
+部署后跑这份考卷，核对你的接线是否复现官方读数。**它检查的是接线，不是模型质量；卷里没有真实对话的轮次，
 没有咨询师标签，也没有自我消融对照题，看不到「自检通过 ≠ 模型通过验收」一节列出的问题**。
 
 Run this exam after deploying to check that your wiring reproduces the official read-outs. **It
-certifies wiring, not model quality; it has no real conversation turns, no counselor labels and
+checks wiring, not model quality; it has no real conversation turns, no counselor labels and
 no self-erasure pairs, and cannot see the failures listed under "Passing this exam is not model
 acceptance"**.
 
 ```bash
-python eval/run_exam.py                       # ollama on localhost:11434；默认 v10h，标签是 v10 那一套 · default v10h, which is v10's label set
+python eval/run_exam.py
 python eval/run_exam.py --base-url http://myhost:11434 --model my-tag
-python eval/run_exam.py --labels v10          # 部署 v10：标签相同，按 v10 的带判 · serving v10: same labels, judged by v10's band
-python eval/run_exam.py --labels v9           # 有意部署 v9 · serving v9 on purpose
-python eval/run_exam.py --labels pre_v9       # 有意部署 v7 · serving v7 on purpose
+python eval/run_exam.py --labels v10
+python eval/run_exam.py --labels v9
+python eval/run_exam.py --labels pre_v9
 ```
 
+第一行连 localhost:11434 上的 ollama，默认 `--labels v10h`，也就是 v10 那一套标签。第二行用于别的地址或模型名。`--labels v10` 用于部署
+v10（标签相同，按 v10 的带判）。`--labels v9` 和 `--labels pre_v9` 用于有意部署 v9 或 v7。
+
+The first line expects ollama on localhost:11434 and defaults to `--labels v10h`, which is v10's label
+set. The second is for another host or model name. `--labels v10` is for serving v10 (same labels,
+judged by v10's band). `--labels v9` and `--labels pre_v9` are for serving v9 or v7 on purpose.
+
 这些命令直接调 ollama 的 `/api/generate`，不走 `POST /score`。参考的 `server/docker-compose.yml` 只发布
-8080 端口：要考它，给 `ollama` 服务加 `ports: ["127.0.0.1:11435:11434"]`，重新 `docker compose up`，再加
+8080 端口：要考它，给 `ollama` 服务加 `ports: ["127.0.0.1:11435:11434"]`，在 `server/` 下运行 `docker compose up -d`，再回到仓库根目录，加
 `--base-url http://127.0.0.1:11435`；否则连不上，或考到宿主机 ollama 里的同名模型。
 
 These commands call ollama's `/api/generate`, not `POST /score`. The reference
 `server/docker-compose.yml` publishes only port 8080: to examine it, add
-`ports: ["127.0.0.1:11435:11434"]` to its `ollama` service, run `docker compose up` again and
-pass `--base-url http://127.0.0.1:11435`. Otherwise the script cannot connect, or grades a host
+`ports: ["127.0.0.1:11435:11434"]` to its `ollama` service, run `docker compose up -d` in `server/`, then
+from the repo root pass `--base-url http://127.0.0.1:11435`. Otherwise the script cannot connect, or grades a host
 ollama's model of the same name.
 
 | `--labels` | 字段 · key | A | B | 用于 · for |
@@ -120,30 +127,48 @@ token，对照默认标签（v10 那一套；这份考卷没有咨询师标签�
   中性采样（temperature 0、repeat_penalty 1.0、top_k 0、top_p 1.0）。
 
 v10h 这两列都不是 `run_exam.py` 跑出来的（判分公式相同，模型直接经 MLX 与 llama.cpp 调用），也没有经过 ollama
-自己的程序。下面前三项是 v10 的读数，第四项是 v10h 上的同样三项核对；v10h 的架构、量化和文件大小与 v10 相同。
+自己的程序。下面前三项是 v10 的读数，第四项是 v10h 上的同样三项核对，第五项是 v10h 经 Docker 里的 ollama 的读数；
+v10h 的架构、量化和文件大小与 v10 相同。
 
 - **`run_exam.py` 端到端（v10）**：用 0.3.0 的代码原样跑 `python eval/run_exam.py`，对着一个本地的 ollama 兼容测试服务
   （`/api/generate` 接口后接 llama.cpp + Metal；同一个 GGUF 与模板）。它是仿真服务，不是 ollama 本身，也不在
-  工具包里。服务端故意留着 ollama 的默认采样，只靠工具包随请求发送的参数保持中性。读数与 v10 的 q8 一致：
+  工具包里。服务端故意留着默认采样，含 `repeat_penalty 1.1`（ollama 0.32.9 及以前的默认值，0.32.10 起为 1.0），只靠
+  工具包随请求发送的参数保持中性。读数与 v10 的 q8 一致：
   维度级 87.3%（A 92 · W 79 · E 86 · H 93 · B 86），JSON 100%，不同读数 78 种，闸门区 10/10。
 - **经 ollama 的跨运行环境核对（v10）**：同一个 GGUF，一台 ARM CPU 服务器，100 道合成题对 Metal 上的
   llama.cpp。关掉服务端提示词缓存时，五个分数完全相同 98 题，五维都在 ±0.5 内 99 题；开着缓存（ollama 0.32.5
-  的默认状态，参考 compose 没有关，见 FAQ）的前一次是 95 与 98 题。
+  的默认状态；`main` 上的 compose 文件自 2026-10-31 起把它关掉，`v0.4.0` 标签里的文件不关，见 FAQ）的前一次是 95 与 98 题。
 - **经 ollama 的服务端核对（v10）**：方案草案写定的核对（旧 B 卷与旧 W 安全卷中的 138 题，按工具包规则截短）
   复现了 Metal 的计数：B 符号翻转 2/93（同两道题），「绝望但行动」W ≥ 1.5 为 45/45。
 - **v10h 的同样三项核对（2026-10-30、31）**：`run_exam.py` 端到端（同一类仿真服务，用 0.4.0 的代码）与上表 q8 一列
   一致：维度级 86.7%，JSON 100%，不同读数 99 种，闸门区 10/10。同一台 ARM CPU 服务器经 ollama，服务端提示词缓存关闭：
   同样 138 题，B 符号翻转 0/93，「绝望但行动」W ≥ 1.5 为 45/45，与 Metal 的计数相同；为这次核对另抽的 100 道合成题上，
   与 Metal 上的 llama.cpp 相比，五个分数完全相同 96 题，五维都在 ±0.5 内 100 题。
+- **`run_exam.py` 经 Docker 里的 ollama（v10h，2026-10-31 与 11-01）**：在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，
+  ollama 0.40.13），提示词缓存关闭，与 `main` 上的 compose 文件一致。模型已预热（compose 启动后的状态）：维度级 86.7%
+  （A 82.1 · W 82.6 · E 83.1 · H 95.4 · B 90.3），JSON 100%，不同读数 97 种，闸门区 10/10，在带内。脚本打印
+  `A82% W83% E83% H95% B90%`，不是 llama.cpp + Metal 参考的 `A83%`。同样 195 题走 `POST /score`：86.7%，195 题的五个分数
+  全部相同。如果考卷第一题就是模型加载后的第一条请求：86.4%（A 82.6 · W 82.6 · E 82.6 · H 94.9 · B 89.2），不同读数 99 种，
+  同样在带内；第一题之前多一条请求（compose 的预热，或 `/healthz` 探测）得到的是预热后的读数。两种状态有 11 题读数不同，
+  其中 1 题相差超过 ±0.5。2026-11-01 从同一状态出发、同样顺序的 195 题，重跑得到相同的读数；同一条消息连发两次则不一定（设置相同、交替调用时 60 题有 57 题一致）。对 llama.cpp + Metal，同样 195 题：
+  模型已预热时五个分数完全相同 184 题，五维都在 ±0.5 内 195 题；从刚加载的状态开始是 182 与 194 题。缓存关闭、模型已预热时，ollama
+  0.32.5、0.40.12、0.40.13 在这 195 题上的回答逐字节相同。这些运行用的是 GGUF 自带的聊天模板，不是上表 q8 一列经 llama.cpp
+  用的 `server/Modelfile` 模板（见 [FAQ](../docs/faq.md)）。上述差异的原因没有查。compose 跟随 `ollama/ollama:latest`，当时是 0.40.13。这是一台机器上的一次记录，没有 x86 上的记录。
 
 **合格带。** 维度级 84–90% 定于 2026-10-05，v10h 沿用（参考值 86.7%，上下约 3 个点）。A 的下限 2026-10-30 按
 v10h 定为 81；v10 仍是 86（见「部署的是 v10、v9 或 v7？」）。延迟取决于你的硬件，不属于合格带。
 
-**A 这条线余量很小。** v10h 的 A 读 82.6，v10 读 91.8：这套标签的 A 走 v8 口径，v10h 的 A 跟随咨询师复核（见
-[模型卡](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)）。下限 81 仍在 v7 权重
-之上（这套标签上 A 为 80.5），但本卷每题约 0.5 个点：v7 比下限少 1 题，v10h 只比下限多 3 题。脚本按整数百分比
-打印各维，v10h 打印 `A83% W83% E83% H95% B90%`，而 v7 的 80.5 打印成 `A81%`，看上去压线过了。所以 A 要和维度级、
-B 一起看：v7 是 83.3 / 83.5%（低于下限 84%）、B 82.6 / 83.1，v10h 是 86.8 / 86.7%、B 90.3。
+**A 这条线余量很小。** v10h 的 A 读 82.6，v10 读 91.8（bf16 经 MLX、q8 经 llama.cpp + Metal 都是这两个数；经 Docker 里的
+ollama，即上面第五项的环境，模型已预热时是 82.1 与 92.3）：这套标签的 A 走 v8 口径，v10h 的 A 跟随咨询师复核（见
+[模型卡](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)）。在 llama.cpp + Metal 上，A 的下限
+高于 v7 权重（这套标签上 A 为 80.5），但本卷每题约 0.5 个点：v7 比下限少 1 题，v10h 只比下限多 3 题。经 Docker 里的
+ollama，模型已预热时，v7 的 A 是 81.0（158/195），正好压线，v10h（160/195）只比下限多 2 题，所以在那里 A 的下限单独分不开这两个版本。
+维度级的下限 84 在这一遍里分开了（v7 83.8），但差距小于模型状态本身带来的 0.3 个点（v10h 86.7 对 86.4），不要只靠它，还要比 B。
+脚本按整数百分比打印各维：v10h 在 llama.cpp + Metal 上打印 `A83% W83% E83% H95% B90%`；经 Docker 里的 ollama，预热后打印
+`A82% W83% E83% H95% B90%`，从刚加载的状态开始打印 `A83% W83% E83% H95% B89%`（A 82.6，161/195）；v7 两种运行环境都打印 `A81%`，
+它在 Metal 上的 80.5 看上去也压线过了。所以 A 要和维度级、B 一起看：在 Metal 上（bf16 经 MLX / q8 经 llama.cpp）v7 是
+83.3 / 83.5%（低于下限 84%）、B 82.6 / 83.1，v10h 是 86.8 / 86.7%、B 90.3；经 Docker 里的 ollama，模型已预热时，v7 是 83.8%、B 84.1，
+v10h 是 86.7%、B 90.3。
 
 **这份考卷查不出 Modelfile 漏写采样参数。** `run_exam.py` 每次请求都带中性采样参数，而请求参数优先于
 Modelfile——v10 的端到端核对就是服务端采样没有中性化的情形，读数照样是 87.3%。必须手工核对（排查第 0 条）。
@@ -160,19 +185,21 @@ this exam has no counselor labels).
 
 Neither v10h column came from `run_exam.py` (same grading formula, with the model called directly
 through MLX and llama.cpp), and neither ran through ollama's own binary. The first three items below are
-v10 read-outs and the fourth is the same three checks on v10h; v10h has the same architecture,
-quantization and file size.
+v10 read-outs, the fourth is the same three checks on v10h, and the fifth is v10h through ollama on
+Docker; v10h has the same architecture, quantization and file size.
 
 - **`run_exam.py` end to end (v10)**: `python eval/run_exam.py` as shipped in 0.3.0, against a local
   ollama-compatible test server (llama.cpp + Metal behind an `/api/generate` endpoint; same GGUF
   and template). It is an emulation, not ollama itself, and not part of the toolkit. The server
-  deliberately kept ollama's default sampling, so only the options the toolkit sends with each
+  deliberately kept default sampling, with `repeat_penalty 1.1`, ollama's default through 0.32.9
+  (1.0 from 0.32.10), so only the options the toolkit sends with each
   request kept sampling neutral. It matched v10's q8: dimension-level 87.3% (A 92 · W 79 · E 86 ·
   H 93 · B 86), JSON 100%, 78 distinct read-outs, gate section 10/10.
 - **Cross-runtime check through ollama (v10)**: same GGUF, an ARM CPU server, 100 synthetic items
   against llama.cpp on Metal. Identical five-score read-out on 98 items and all five within ±0.5
-  on 99 with the server's prompt cache off; an earlier run with it on (ollama 0.32.5's default,
-  not switched off by the reference compose file; see the FAQ) gave 95 and 98.
+  on 99 with the server's prompt cache off; an earlier run with it on (ollama 0.32.5's default; the
+  compose file on `main` has switched it off since 2026-10-31, the file at the `v0.4.0` tag leaves
+  it on; see the FAQ) gave 95 and 98.
 - **Serving check through ollama (v10)**: the check specified in the draft protocol (138 items of
   the old B and old W safety exams, toolkit prompt trimming) reproduced Metal's counts: B sign
   flips 2/93 on the same two items, despair-plus-action W ≥ 1.5 on 45/45.
@@ -182,19 +209,47 @@ quantization and file size.
   server's prompt cache off: the same 138 items gave B sign flips 0/93 and despair-plus-action
   W ≥ 1.5 on 45/45, the same counts as on Metal; on 100 synthetic items drawn for this check, against
   llama.cpp on Metal, identical five-score read-out on 96 items and all five within ±0.5 on 100.
+- **`run_exam.py` through ollama on Docker (v10h, 2026-10-31 and 11-01)**: on one Apple-silicon Mac (Docker
+  under Colima, arm64 CPU, ollama 0.40.13), with the prompt cache off, as in the compose file on
+  `main`. With the model warmed, as compose leaves it: dimension-level 86.7% (A 82.1 · W 82.6 ·
+  E 83.1 · H 95.4 · B 90.3), JSON 100%, 97 distinct read-outs, gate section 10/10, inside the band.
+  The script prints `A82% W83% E83% H95% B90%`, not the `A83%` of the llama.cpp + Metal reference.
+  The same 195 through `POST /score`: 86.7%, all five scores equal on all 195. If the exam's
+  first question is the first request after a model load: 86.4% (A 82.6 · W 82.6 · E 82.6 ·
+  H 94.9 · B 89.2), 99 distinct read-outs, also inside the band. One request before the first
+  question (compose's warm-up, or the `/healthz` probe) gave the warmed reading. The two states
+  differ on 11 of the 195 answers, one of them by more than ±0.5. On 2026-11-01, repeat passes of the
+  same 195 prompts in the same order, from the same state, gave the same answers; one message sent twice in
+  a row need not (with identical settings, alternating calls agreed on 57 of 60). Against llama.cpp + Metal on the same
+  195: identical five-score read-out on 184 and all five within ±0.5 on all 195 with the model
+  warmed, 182 and 194 from a fresh load. With the cache off and the model warmed, ollama 0.32.5,
+  0.40.12 and 0.40.13 gave byte-identical answers on all 195. These runs use the GGUF's own chat template, not the
+  `server/Modelfile` template that the q8 column used through llama.cpp (see the
+  [FAQ](../docs/faq.md)). The cause of these differences was not investigated. Compose tracks
+  `ollama/ollama:latest`, which was 0.40.13 on that date. This is one record on one machine; there
+  is no x86 run.
 
 **The band.** The 84–90% band was set on 2026-10-05 and v10h keeps it (reference 86.7%, about ±3
 points). The A floor was set to 81 for v10h on 2026-10-30; v10 keeps 86 (see "Serving v10, v9 or
 v7?"). Latency depends on your hardware and is not part of the band.
 
-**The A floor has little margin.** v10h reads 82.6 on A against v10's 91.8: A on these labels
+**The A floor has little margin.** v10h reads 82.6 on A against v10's 91.8 (the same two figures
+from bf16 through MLX and from q8 through llama.cpp with Metal; through ollama on Docker, the setup
+of the fifth item above, with the model warmed, they are 82.1 and 92.3): A on these labels
 follows rubric v8, and v10h's A follows the counselor review (see the
-[model card](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)). The
-floor of 81 still sits above v7 weights (A 80.5 on these labels), but each question is worth about
-0.5 points: v7 is 1 question under the floor and v10h only 3 over it. The script prints each
-dimension as a whole percent: v10h prints `A83% W83% E83% H95% B90%`, and v7's 80.5 prints as
-`A81%`, which looks like a pass. So read A together with the dimension-level number and B: v7
-reads 83.3 / 83.5% (under the floor of 84%) with B 82.6 / 83.1, v10h 86.8 / 86.7% with B 90.3.
+[model card](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)). On
+llama.cpp with Metal the A floor sits above v7 weights (A 80.5 on these labels), but each question
+is worth about 0.5 points: v7 is 1 question under the floor and v10h only 3 over it. Through ollama
+on Docker, warmed, v7 reads A 81.0 (158 of 195), exactly on the floor, and v10h (160 of 195) is 2
+questions over it, so there the A floor alone does not separate them. The dimension-level floor of
+84 did in this one pass (v7 83.8), by less than the 0.3 points that model state alone moved v10h
+(86.7 against 86.4), so do not rely on it alone: compare B as well. The script prints each dimension
+as a whole percent: v10h prints `A83% W83% E83% H95% B90%` on llama.cpp with Metal; through ollama on
+Docker it prints `A82% W83% E83% H95% B90%` warmed and `A83% W83% E83% H95% B89%` from a fresh load
+(A 82.6, 161 of 195); v7 prints `A81%` on both runtimes: its 80.5 on Metal looks like a pass. So read
+A together with the dimension-level number and B: on Metal (bf16 through MLX / q8 through llama.cpp)
+v7 reads 83.3 / 83.5% (under the floor of 84%) with B 82.6 / 83.1, v10h 86.8 / 86.7% with B 90.3;
+through ollama on Docker, warmed, v7 reads 83.8% with B 84.1, v10h 86.7% with B 90.3.
 
 **The exam cannot catch a Modelfile that omits the sampling parameters.** `run_exam.py` sends
 neutral sampling with each request, and request options override the Modelfile — v10's end-to-end
@@ -244,8 +299,7 @@ Bold cells are the ones where weights and labels match.
 - **判卷逻辑没变**：0.4.0 只给同一套标签加了名字 `v10h`。这次只量了 v10h 那两行；v7、v9 的四个粗体格是
   0.3.0 发布时重新跑的，与更早发布的参考值相同。
 - **同分布，但没有咨询师标签**：标签出自给 v10 训练数据打标的同一套教师提示词，这份考卷按构造就与 v10 同分布。
-  v10h 的合成训练标签是复核后的分数，这份考卷没有复核，所以它量不到 v10h 离咨询师有多近。它认证的是接线
-  （权重、聊天模板、`num_predict`、stop；提示词、采样、解析器是工具包自己的）；86.7% 不是准确率，
+  v10h 的合成训练标签是复核后的分数，这份考卷没有复核，所以它量不到 v10h 离咨询师有多近。过关说明你的部署与考卷标签的一致程度和参考值相当、`num_predict` 没有设得过小，走的是工具包自己的提示词、采样与解析器，不是你的。它说明不了你跑的是哪个版本（v10 权重也过得了 v10h 的带），也不检查聊天模板和 `stop`：在 ollama 0.40.13 上，60 道题里缺了这两项的 ollama 标签读数相同。这两项用 `ollama show <tag> --template` 和 `--parameters` 核对。86.7% 不是准确率，
   也不要拿这份考卷给版本排名（v10h 比 v10 略低，说明不了谁更好）。
 
 - **A band applies to bold cells only** (v10h's band is in the previous section; v10's, v9's and
@@ -271,8 +325,7 @@ Bold cells are the ones where weights and labels match.
 - **In-distribution, but no counselor labels**: the labels come from the same teacher prompts as
   v10's training labels, so this exam is in-distribution for v10 by construction. v10h's synthetic
   training labels are the review's scores and this exam was not reviewed, so it cannot show how
-  close v10h is to the counselors. It certifies wiring (served weights, chat template,
-  `num_predict`, stop; prompt, sampling and parser are the toolkit's own); 86.7% is not an accuracy
+  close v10h is to the counselors. A pass shows that your deployment agrees with the exam's labels about as well as the reference does, and that `num_predict` is not too small, through the toolkit's own prompt, sampling and parser, not yours. It does not show which version you serve (v10 weights also pass v10h's band), and it does not check the chat template or `stop`: on ollama 0.40.13 tags without them read the same on 60 questions. Check those with `ollama show <tag> --template` and `--parameters`. 86.7% is not an accuracy
   figure, and this exam must not be used to rank versions (v10h reading slightly under v10 says
   nothing about which is better).
 
@@ -368,7 +421,7 @@ population you serve, and do not treat the gate as complete crisis detection.
 是 0，参照压力公式里 B 的负权重乘的是 0，减压项就没了——真实终评 453 轮上（随包 q8，llama.cpp + Metal），
 平均每轮原始压力变化按 v9 的读数是 +0.37，按参照标签是 −0.68（v10h −0.63，v10 −0.72），重调阈值或 B 的权重都修不回来。
 把分数喂给 B 为负权重的公式（工具包的 `update_stress()` 就是）的，请用 v10h 或 v10，或退回 v7；完整说明见
-[集成指南里关于 v9 的更正](../docs/integration.md#更正重调阈值修不好-v9)。本考卷只验证接线，不替你校准压力权重和分桶阈值。
+[集成指南里关于 v9 的更正](../docs/integration.md#更正重调阈值修不好-v9)。本考卷只检查接线，不替你校准压力权重和分桶阈值。
 
 **Correction.** The 0.2.0 version of this page told v9 users to re-tune stress weights and bucket
 cut-offs. That advice was not enough: v9's crisp B is 0 on most ordinary messages, so the
@@ -392,7 +445,8 @@ This exam checks wiring; it does not calibrate stress weights or bucket cut-offs
 - 摘要、safetensors 固定版本与回退步骤见[集成指南](../docs/integration.md#固定版本与回退)；
   `server/docker-compose.yml` 顶部列了这三个版本的文件名与摘要。
 - **v10**：`--labels v10` 与默认算出的数字相同，要紧的是按 v10 的带判：A ≥ 86，这条下限用来分出 v7 权重（A 80.5）。
-  不同读数种类参考值 75 / 78。
+  不同读数种类参考值 75 / 78（bf16 / q8）；在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13）
+  是 80 种。
 - **v9**：v9 标签里 195 题有 154 题的 B 是 0，95.9% 的 B 一致率有一部分只是基础比例；恒定输出 0.5 在这套
   标签上就有 84.9%，所以要同时看读数种类数（参考值 57 / 56）。v9 没有通过它自己五道预注册闸门中的两道
   （v9 的闸门 4：真实终评上 W/E/H 的下限；v9 的闸门 5：W 安全），同样经创始人裁决发布。
@@ -403,7 +457,8 @@ This exam checks wiring; it does not calibrate stress weights or bucket cut-offs
   `server/docker-compose.yml` lists the file names and digests of these three versions.
 - **v10**: `--labels v10` gives the same numbers as the default; what matters is judging by v10's
   band: A ≥ 86, the floor that separates v10 weights from v7 weights (A 80.5). Reference distinct
-  read-outs 75 / 78.
+  read-outs 75 / 78 (bf16 / q8); 80 on one Apple-silicon Mac (Docker under Colima, arm64 CPU, ollama
+  0.40.13).
 - **v9**: 154 of the 195 v9 B labels are 0, so v9's 95.9% on B is partly base rate, and on these
   labels a constant 0.5 output already reads 84.9% — read the number of distinct read-outs as
   well (reference 57 / 56). v9 failed two of its own five pre-registered gates (v9's gate 4, the
@@ -495,17 +550,22 @@ compensate. The upstream crisis requirement holds at any quantization. On v7 we 
 below Q4_K_M; assume anything unmeasured is worse.
 
 ```bash
-# 1. 已发布的权重（HF 格式；main 即 v10h）→ f16 GGUF · released weights (HF format; main is v10h) → f16 GGUF
+# 1. 已发布的权重：HF 格式，main 即 v10h → f16 GGUF · released weights, HF format, main is v10h → f16 GGUF
 python llama.cpp/convert_hf_to_gguf.py <v10h-weights-dir> --outtype f16 --outfile hamo-score-0.6b-v10h.f16.gguf
 # 2. f16 → 目标档位 · f16 → target quant（Q6_K 或 or Q4_K_M）
 llama-quantize hamo-score-0.6b-v10h.f16.gguf hamo-score-0.6b-v10h.q4_k_m.gguf Q4_K_M
 # 3. 每档复制一份 server/Modelfile，只改 FROM · one copy of server/Modelfile per build, change only FROM
 #    （原文件的 FROM 是 · the shipped FROM is /tmp/hamo/gguf/hamo-score-0.6b-v10h.q8.gguf）
-cp server/Modelfile Modelfile.q4                 # then edit FROM → your ...v10h.q4_k_m.gguf
-ollama create hamo-q8 -f server/Modelfile        # 基准档在前 · reference build first: the shipped v10h Q8_0
+cp server/Modelfile Modelfile.q4
+ollama create hamo-q8 -f server/Modelfile
 ollama create hamo-q4 -f Modelfile.q4
 python eval/compare_quants.py --models hamo-q8 hamo-q4
 ```
+
+运行 `ollama create hamo-q4` 之前，把 `Modelfile.q4` 的 FROM 改成你的 ...v10h.q4_k_m.gguf。`hamo-q8` 是随包的 v10h Q8_0，作为基准，放在前面。
+
+Before the `ollama create hamo-q4` line, edit FROM in `Modelfile.q4` to your ...v10h.q4_k_m.gguf.
+`hamo-q8`, the shipped v10h Q8_0, is the reference build and comes first.
 
 `compare_quants.py` 在本仓库的合成考卷上跑各档（零真实数据），除各档一致率外，还输出**方向性衰减表**：每个
 维度「更低 / 更高」的题数，以及高退缩题（教师 W ≥ 1.5）上 W 更低 / 更高的题数与各档 W 均值。单边分布就是
@@ -526,7 +586,8 @@ one version; across versions the script measures a version gap.
 
 0. **先查采样参数，而且要手工查——这份考卷看不到它。** `ollama show <model> --parameters` 必须看到
    `repeat_penalty 1`；你自己的服务也要随请求带上 temperature 0、repeat_penalty 1.0、top_k 0、top_p 1.0。
-   ollama 默认的 1.1 会惩罚本模型输出里重复的 `0.0`，把分数推离 0。随包 v10 q8 实测（旧 B 卷，legacy 答案，
+   `repeat_penalty 1.1`（ollama 0.32.9 及以前的默认值，0.32.10 起为 1.0）会惩罚本模型输出里重复的 `0.0`，把分数推离 0。
+   随包 v10 q8 实测（旧 B 卷，legacy 答案，
    300 道合成题，不在本仓库；llama.cpp + Metal），只把 repeat_penalty 从 1.0 改成 1.1：造分（应打低的题
    打到 B ≥ 1.0）3/104（2.9%）→ 15/104（14.4%）；B 符号翻转 93 题中 2 → 4 题；成对方向正确 59/60 → 58/60；
    漏判（应打高的题打到 B ≤ 0.5）21/180（11.7%）→ 12/180（6.7%），这个「下降」是同一股上推，不是改进。
@@ -543,24 +604,29 @@ one version; across versions the script measures a version gap.
    - 约 83%、A 75 左右：v10h 权重配了 `--labels pre_v9`（82.9%）。去掉这个开关。
 
    核对三处：Modelfile 的 `FROM` 指向哪个 GGUF，服务实际调用哪个模型标签，命令行带了哪个 `--labels`。
-2. **JSON 合法率 < 99%** → 聊天模板错了：检查模板是否带空 `<think>` 块（见 `server/Modelfile`）。温度由
-   考卷随请求发送为 0，只有服务端不采纳请求参数时才出问题（第 3 条）。
+2. **JSON 合法率 < 99%** → 先查 `num_predict`（随包是 80）：在 ollama 0.40.13 上，`num_predict` 设成 20 的 ollama 标签在 60 道题上
+   JSON 合法率是 0%。在 ollama 0.32.5、0.40.12、0.40.13 上，默认设置下用 v10h 的 GGUF 时，Modelfile 的模板不是原因：它们会存下
+   `server/Modelfile` 的模板，但实际用 GGUF 自带的聊天模板（见 [FAQ](../docs/faq.md)）。在 0.40.13 上，Modelfile 里去掉空 `<think>`
+   块什么也没变（60 题，0 条解析失败，同样 85.7%）。设了 `OLLAMA_GO_TEMPLATE=1` 时 ollama 用你写的模板，再去掉这个块，模型也会自己写出它
+   （195 题，JSON 100%）。在确实采用你写的模板的运行环境上，接着查模板。温度由考卷随请求发送为 0，只有服务端不采纳请求参数时才出问题（第 3 条）。
 3. **维度级明显低于 84% 且不是第 1 条，或脚本提示不同读数太少**（全卷少于 19 种，即近乎恒定输出；v10h
-   参考值 97 / 99）→ 服务端跑的多半不是「随包 q8 + 随包模板」：GGUF 不对，模板与 `server/Modelfile` 不同，
+   参考值 97 / 99）→ 服务端跑的多半不是随包 q8 的原样部署：GGUF 不对，模板与 `server/Modelfile` 不同（只在确实采用
+   你写的模板的运行环境上才算，见第 2 条），
    用了没量过的量化档，或服务端不采纳请求参数（此时生效的是它自己的采样默认值）。考卷用的是工具包的
    `build_prompt()` 与 `parse_scores()`，查不出你自己服务里的提示词、采样与解析——那些要另外对照
    `build_prompt()` 核对。
 4. **闸门区 ≠ 10/10** → 你运行的 `hamo_score` 里 `CrisisGate` 的词表被改动了（这一节在进程内直接跑闸门）。
    许可证 §3(c) 要求在模型上游用独立机制处理危机与自伤内容；修复后再上线。
-5. **数字在带内，但版本不对** → 看 A。A 92 左右、不同读数 75–78 种：跑的还是 v10，它过得了 v10h 的带；要用 v10h
+5. **数字在带内，但版本不对** → 看 A。A 92 左右、不同读数 75–80 种：跑的还是 v10，它过得了 v10h 的带；要用 v10h
    就换 GGUF（核对第 1 条那三处）。A 83 左右却没过 86：跑的是 v10h，你拿了 v10 的带，换成 v10h 的带。
 
 Large deviations from the band are usually wiring, not the model. Check in this order.
 
 0. **Sampling parameters first — by hand, because this exam cannot see them.**
    `ollama show <model> --parameters` must show `repeat_penalty 1`, and your own service must
-   send temperature 0, repeat_penalty 1.0, top_k 0 and top_p 1.0 as well. ollama's default 1.1
-   penalises the repeated `0.0` in this model's output and pushes scores away from zero. Measured
+   send temperature 0, repeat_penalty 1.0, top_k 0 and top_p 1.0 as well. `repeat_penalty 1.1`,
+   ollama's default through 0.32.9 (1.0 from 0.32.10), penalises the repeated `0.0` in this model's
+   output and pushes scores away from zero. Measured
    on the shipped v10 q8 (old B exam, legacy key, 300 synthetic questions, not shipped here;
    llama.cpp + Metal), changing only repeat_penalty from 1.0 to 1.1: fabrication (items that
    should score low, scored B ≥ 1.0) 3/104 (2.9%) → 15/104 (14.4%); B sign flips 2 → 4 of 93;
@@ -583,13 +649,21 @@ Large deviations from the band are usually wiring, not the model. Check in this 
 
    Check three things: which GGUF your Modelfile's `FROM` points to, which model tag your service
    calls, and which `--labels` you passed.
-2. **JSON validity below 99%** means a broken chat template: check the empty `<think>` block (see
-   `server/Modelfile`). The exam sends temperature 0 itself, so temperature can only be wrong on
-   a server that ignores request options (case 3).
+2. **JSON validity below 99%**: check `num_predict` first (the shipped value is 80): on ollama
+   0.40.13 a tag with 20 gave JSON 0% on 60 questions. On ollama 0.32.5, 0.40.12 and 0.40.13, with
+   default settings and the v10h GGUF, a Modelfile template is not the cause: they store the
+   template from `server/Modelfile` but serve the GGUF's own chat template instead (see the
+   [FAQ](../docs/faq.md)). On 0.40.13, removing the empty `<think>` block from a Modelfile changed
+   nothing (0 parse failures and the same 85.7% on 60 questions). With `OLLAMA_GO_TEMPLATE=1` ollama
+   serves your template, and with the block removed the model wrote it itself (JSON 100% on 195
+   questions). On a runtime that does apply your template, check the template next. The exam sends
+   temperature 0 itself, so temperature can only be wrong on a server that ignores request options
+   (case 3).
 3. **Dimension-level clearly below 84% and not case 1, or the script warns of few distinct
    read-outs** (fewer than 19 on the full exam, that is, close to a constant output; the v10h
-   reference has 97 / 99): the server is most likely not running the shipped q8 behind the
-   shipped template — the wrong GGUF, a chat template that differs from `server/Modelfile`, an
+   reference has 97 / 99): the server is most likely not running the shipped q8 as shipped:
+   the wrong GGUF, a chat template that differs from `server/Modelfile` (only on
+   a runtime that applies your template; see case 2), an
    unmeasured quantization, or a server that ignores request options (its own sampling defaults
    then apply).
    The exam uses the toolkit's `build_prompt()` and `parse_scores()`, so it cannot check the
@@ -598,7 +672,7 @@ Large deviations from the band are usually wiring, not the model. Check in this 
    have been altered (this section runs the gate in-process). License §3(c) requires an
    independent mechanism upstream of the model for crisis and self-harm content; fix it before
    going live.
-5. **Numbers inside the band, wrong version**: look at A. A near 92 with 75–78 distinct read-outs
+5. **Numbers inside the band, wrong version**: look at A. A near 92 with 75–80 distinct read-outs
    means you are still serving v10, which passes v10h's band; to serve v10h, swap the GGUF (the
    three things in case 1). A near 83 that fails a floor of 86 means you are serving v10h and
    using v10's band; use v10h's.

@@ -22,13 +22,14 @@ from .safety import CrisisGate, CrisisResult
 
 # Neutral sampling, sent with every request. The output is highly repetitive
 # ('"A": 0.0, "W": 0.0, ...'), so any repeat penalty pushes scores away from 0 —
-# with repeat_penalty 1.1 (ollama's default) the fabrication rate on the old B exam rose in each of the
+# with repeat_penalty 1.1, ollama's default through 0.32.9 (1.0 from 0.32.10),
+# the fabrication rate on the old B exam rose in each of the
 # five versions we measured (v6.1, v7, v10 and v10h under the legacy key, v9 under the crisp key). v10 q8,
 # old B exam (legacy key), llama.cpp + Metal: 3/104 -> 15/104 (2.9% -> 14.4%). On v10h, same test, B moves
 # little (18/104 -> 21/104), but A, W and E move. Request options
 # override the Modelfile, so a Modelfile that omits these can no longer silently break scoring.
 # 中性采样，随每次请求发送：输出里大量重复的 "0.0"，任何重复惩罚都会把分数推离 0
-# （repeat_penalty 取 ollama 的默认值 1.1 时，我们量过的五个版本在旧 B 卷上的造分率都升高：v6.1、v7、v10、v10h 按 legacy 答案，
+# （repeat_penalty 取 1.1（ollama 0.32.9 及以前的默认值，0.32.10 起为 1.0）时，我们量过的五个版本在旧 B 卷上的造分率都升高：v6.1、v7、v10、v10h 按 legacy 答案，
 # v9 按 crisp 答案；v10 随包 q8，旧 B 卷（legacy 答案），llama.cpp + Metal：3/104 → 15/104，即 2.9% → 14.4%；
 # v10h 同样测试下 B 变化不大（18/104 → 21/104），但 A、W、E 动了）。
 # 请求参数优先于 Modelfile，所以即使 Modelfile 漏写，评分也不会再被悄悄带偏。

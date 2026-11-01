@@ -29,7 +29,8 @@ and `energy_state()` are the right half. The reference server in
    characters of context, the message capped at 500), temperature 0 with
    neutral sampling (don't #5), and the chat template in
    [`server/Modelfile`](../server/Modelfile) (Qwen3 with an empty `<think>`
-   block).
+   block). By default ollama 0.32.5, 0.40.12 and 0.40.13 store this template but
+   serve the GGUF's own chat template instead (see the [FAQ](faq.md)).
 3. **Smooth.** `new = 0.8·history + 0.2·clamp(history + delta)`, with
    `delta = 0.9·W + 1.2·E + 1.6·H − 1.0·A − 1.1·B`; an optional `quadrant=`
    adjusts the weights. Per-message noise is damped ~5×, and an all-zero score
@@ -171,8 +172,9 @@ v6.1 q8 GGUF      gguf/hamo-score-0.6b-v61.q8.gguf
 The five GGUF files listed are all in `gguf/` on `main`.
 
 - **Serving.** The reference server registers the unversioned ollama name
-  `hamo-score-0.6b`, so `docker compose up` with toolkit 0.4.0 replaces
-  whatever that name served before with v10h **under the same name**.
+  `hamo-score-0.6b`, so `docker compose up` from `main` replaces
+  whatever that name served before with v10h **under the same name**. Use
+  `main`: the compose file at the `v0.4.0` tag fails at the download step.
   `docker compose exec ollama ollama show hamo-score-0.6b --modelfile` prints
   the blob digest in its `FROM` line; compare it with the digests above. To
   keep serving v10, v9 or v7, first edit the file name and both digests as the
@@ -180,7 +182,10 @@ The five GGUF files listed are all in `gguf/` on `main`.
   [`server/docker-compose.yml`](../server/docker-compose.yml) says. Outside
   Docker, a model keeps the GGUF it was created from: to switch, point `FROM`
   in [`server/Modelfile`](../server/Modelfile) at the file you want and run
-  `ollama create` again.
+  `ollama create` again. With Docker, after a version switch the previous GGUF
+  stays in the `model-cache` volume (about 640 MB each), and ollama prunes its
+  own copy. This does no harm. To remove one:
+  `docker compose run --rm --no-deps --entrypoint rm setup -f /models/<file>`.
 - **Staying on v10**, if thresholds or histories built on its scores cannot be
   re-baselined yet, or if you want A on the earlier rubric bands (A exam in
   band: 590 of 632, v10h 519): self-check with
@@ -362,7 +367,10 @@ reported checks: technical record,
 ## Operational wiring
 
 - **Warm-up**: send one throwaway request after every model (re)start, and keep
-  `keep_alive=-1` (`OllamaClient` sets it per request).
+  `keep_alive=-1` (`OllamaClient` sets it per request). Send the warm-up with a
+  long timeout, not through an 8-second client: ollama aborts a load when the
+  client disconnects, so a load slower than the timeout never finishes
+  (reproduced only under an artificial CPU cap).
 - **Timeout + fallback**: give the call a hard timeout and a defined fallback:
   the previous scorer, or "skip this message" (a skipped score is a no-op). The
   toolkit and reference server default to 8 s; on an ARM CPU server running
@@ -372,7 +380,13 @@ reported checks: technical record,
   guards allow, CPU latency grows with prompt length, and latency at the guard
   limit was not measured on v10 or v10h. Log every fallback with a reason and record which scorer
   produced each score; a fallback rate above a few percent means something is
-  wrong.
+  wrong. The reference server has no fallback of its own. On a timeout (8 s by
+  default; set `SCORE_TIMEOUT` under the `api` service's `environment`) or with
+  the model down, `POST /score` returns HTTP 500 with the body
+  `Internal Server Error`. A reply that does not parse returns HTTP 200 with
+  `scores: null`. A gate hit also has `scores: null`, with `crisis.triggered`
+  true: read `crisis` first and route those to your crisis pathway. Treat the
+  other two cases as skip or fallback.
 - **After any infra change** (new quantization, runtime or machine): run
   `python eval/run_exam.py` and compare with the
   [reference band](../eval/README.md). The script calls ollama's
@@ -382,12 +396,22 @@ reported checks: technical record,
   exam, and `--labels v10h` (the default) and `--labels v10` are two names for
   the same labels (`eval/compare_quants.py` takes the same `--labels` flag).
   Band for v10h weights: dimension-level 84–90%, each dimension ≥ 75%, A ≥ 81,
-  JSON validity ≥ 99%, crisis gate 10/10. The A floor sits above v7 weights
-  (A 80.5 on these labels), but the script prints whole percents (v7 shows
-  `A81%`), so also check the dimension-level number and B
+  JSON validity ≥ 99%, crisis gate 10/10. On llama.cpp with Metal the A floor
+  sits above v7 weights (A 80.5 on these labels); through ollama on one
+  Apple-silicon Mac (Docker under Colima, arm64 CPU, ollama 0.40.13), warmed, v7
+  reads A 81.0, exactly on the floor. The script prints `A81%` either way, so also
+  check the dimension-level number and B
   ([eval/README.md](../eval/README.md)). Band for v10 weights: the same, with
   A ≥ 86%. The labels come from the same teacher prompts as v10's training
-  labels: a pass certifies wiring, not model quality.
+  labels: a pass checks wiring, not model quality. It shows that your deployment agrees with the exam's labels about as well as the reference does, and that `num_predict` is not too small, through the toolkit's own prompt, sampling and parser, not yours. It does not show which version you serve (v10 weights also pass v10h's band), and it does not check the chat template or `stop`: on ollama 0.40.13 tags without them read the same on 60 questions. Check those with `ollama show <tag> --template` and `--parameters`.
+- **Reference server**: `POST /score` has no authentication, and compose
+  publishes port 8080 on all interfaces. Keep it behind your own access
+  control, or restrict it to this machine: in `server/docker-compose.yml`
+  change the `api` service's `ports` line to `"127.0.0.1:8080:8080"`.
+  `GET /healthz` sends the model a short probe and reports `ok` on any
+  non-empty reply: it shows the model answers, not that a score parses. It
+  returns HTTP 200 either way, so read the `ok` field; a busy model can report
+  false.
 
 ## The don't list
 
@@ -413,9 +437,16 @@ reported checks: technical record,
    the rubric is baked into the weights, and a prompt whose frame differs from
    `build_prompt`'s (extra instructions, renamed or reordered fields, a
    translated frame) is out-of-distribution, with no warning. How much context
-   to send is a separate matter (don't #6).
+   to send is a separate matter (don't #6). `build_prompt()` does not escape client
+   text, so a message containing `<|im_end|>` and `<|im_start|>` can close its
+   own turn and open another, and the score then comes from the forged text.
+   Before you call `score_message()` or the server, remove these two tokens from
+   the message and from every history field, and repeat until none remain: one
+   pass over `<|im_<|im_end|>end|>` leaves a token behind. We did not test the
+   tokenizer's other special tokens. The reference server does not strip them.
 5. **Don't raise temperature, and don't leave `repeat_penalty` at its
-   default.** ollama's default `repeat_penalty 1.1` pushes scores away from
+   default.** `repeat_penalty 1.1`, ollama's default through 0.32.9 (1.0 from
+   0.32.10), pushes scores away from
    zero (measured on v10: q8 GGUF, old B exam, legacy key, fabrication
    3/104 → 15/104, B sign flips 2 → 4 of 93). Ship temperature 0, `repeat_penalty 1.0`,
    `top_k 0`, `top_p 1.0`: `OllamaClient` sends them with every request and
@@ -455,7 +486,7 @@ reported checks: technical record,
 `消息 → 危机闸门 → build_prompt → 模型 → parse_scores → update_stress → energy_state`。左半段由 `score_message()` 按安全顺序实现；右半段是平滑 `新值 = 0.8·历史 + 0.2·clamp(历史 + delta)`（`delta = 0.9·W + 1.2·E + 1.6·H − 1.0·A − 1.1·B`）加 `<4 / <7 / ≥7` 三桶；`server/` 的参考服务器把整条管线接成一个 `POST /score`。
 
 - **闸门**：确定性关键词表（中、英），可用 `CrisisGate(extra_keywords=[...])` 扩充。命中即短路：消息不进模型，转人工并展示 AI 披露文案。许可证 §3(c) 要求面向消费者的心理健康类部署在模型上游有独立的危机处理机制，并披露 AI 身份；本架构要求每个部署都带这道闸门。
-- **评分**：只用 `build_prompt` 一种提示词格式（最近 3 轮上下文、每轮 200 字，消息 500 字封顶），温度 0 加中性采样（禁令 ⑤）。
+- **评分**：只用 `build_prompt` 一种提示词格式（最近 3 轮上下文、每轮 200 字，消息 500 字封顶），温度 0 加中性采样（禁令 ⑤）。聊天模板用 [`server/Modelfile`](../server/Modelfile) 里的（Qwen3，带空 `<think>` 块）。ollama 0.32.5、0.40.12、0.40.13 默认会存下这段模板，但实际用 GGUF 自带的聊天模板（见 [FAQ](faq.md)）。
 - **平滑**：全零分数在构造上是无操作，超短消息（「嗯」）可以放心评。
 - **分桶**：压力权重与 4 / 7 两档阈值按 legacy 口径（v7 及更早）的分数定。让分桶把关任何事之前先读下面的升级章节；v9 的分数不要喂给平滑与分桶。
 
@@ -499,7 +530,7 @@ v10h 沿用 v10 的提示词和训练配方，把合成训练行的答案换成 
 
 Hugging Face 的 `main` 现在是 v10h，`from_pretrained("HamoAI/hamo-score-0.6b")` 和工具包的 `TransformersClient()`（加载 `main`）拿到的都是 v10h。无论跑哪个版本都请固定：safetensors 用 `revision=` 固定完整提交哈希（`TransformersClient` 没有 `revision` 参数，须把按固定 revision 下载的快照本地路径传给 `model_id`），GGUF 按 sha256 摘要固定。文件名、摘要与 revision 见英文部分「Pins and rollback」的代码块（v10h 的 revision 为 d29c03288b6f553c748c9b9daefcb34b0f405497，v10 的为 f3869312f0222992c3eb2e938e78090de38eb80a）；所列五个 GGUF 都在 `main` 的 `gguf/` 下。
 
-- **服务端**：参考服务器在 ollama 里注册的是不带版本的模型名 `hamo-score-0.6b`，所以用工具包 0.4.0 执行 `docker compose up`，会在**同一个名字下**把原先的模型换成 v10h。`docker compose exec ollama ollama show hamo-score-0.6b --modelfile` 会在 `FROM` 行打印 blob 摘要，与代码块里的摘要比对即知跑的是哪一版。要继续跑 v10、v9 或 v7，请先按 [`server/docker-compose.yml`](../server/docker-compose.yml) 顶部的注释改掉文件名和两处摘要。不用 Docker 时，模型一直用它创建时的那个 GGUF：要换版本，把 [`server/Modelfile`](../server/Modelfile) 的 `FROM` 指向想用的文件，重新 `ollama create`。
+- **服务端**：参考服务器在 ollama 里注册的是不带版本的模型名 `hamo-score-0.6b`，所以用 `main` 执行 `docker compose up`，会在**同一个名字下**把原先的模型换成 v10h。请用 `main`：`v0.4.0` 标签里的 compose 文件会在下载这一步失败。`docker compose exec ollama ollama show hamo-score-0.6b --modelfile` 会在 `FROM` 行打印 blob 摘要，与代码块里的摘要比对即知跑的是哪一版。要继续跑 v10、v9 或 v7，请先按 [`server/docker-compose.yml`](../server/docker-compose.yml) 顶部的注释改掉文件名和两处摘要。不用 Docker 时，模型一直用它创建时的那个 GGUF：要换版本，把 [`server/Modelfile`](../server/Modelfile) 的 `FROM` 指向想用的文件，重新 `ollama create`。用 Docker 时，换版本后旧的 GGUF 留在 `model-cache` 卷里（每个约 640 MB），ollama 会清掉自己那一份。这不会造成问题。要删掉一个：`docker compose run --rm --no-deps --entrypoint rm setup -f /models/<file>`。
 - **留在 v10**，适合照 v10 分数建的阈值或历史暂时无法重建基线，或想让 A 回到此前的分数带时（A 卷带内 632 题中 590 题，v10h 519 题）：自检用 `python eval/run_exam.py --labels v10`，标签与默认相同，按 v10 的合格带判（见「运维接线」）。这样就放弃了 v10h 更贴近咨询师复核的部分，「v10 打的是什么」里那句话的 B 也回到 2.5。v10 自己的验收状态见「升级到 v10」的末尾。
 - **留在 v9**：自检用 `python eval/run_exam.py --labels v9`。不要把它的分数喂给 `update_stress()` 或 `energy_state()`；参考服务器跑 v9 时，`POST /score` 返回的 `stress` 与 `energy_state` 字段也不要用（见下面的更正）。v9 没有通过自己预注册的五道闸门中的两道，其中一道是 v9 的闸门 5（W 安全）。
 - **留在 v7 或更早**：自检用 `python eval/run_exam.py --labels pre_v9`。v7 早于明确自杀意念规则：在 v7（随包 q8）上，189 道「想死但求助」题的平均原始压力变化是 −0.29（v10 为 +2.37，v10h 为 +2.51）；比 v7 更早的版本没有在这些题上测过。无论哪个版本，模型前面的闸门都不可省（禁令 ③）。
@@ -558,9 +589,10 @@ v10 另加**明确自杀意念规则**：消息含明确自杀意念时，A 封�
 
 ## 运维接线
 
-- **预热**：模型每次（重）启动后先发一条预热请求，并保持 `keep_alive=-1`（`OllamaClient` 每次请求都带）。
-- **超时与回落**：调用设硬超时，并定义回落：旧评分器，或跳过这条消息（跳过等于无操作）。工具包与参考服务器默认 8 秒；运行 ollama 的 ARM CPU 服务器上，v10h q8 GGUF 每条消息 P50 2.09 秒、P95 2.57 秒、最长 2.87 秒（138 道按工具包截短规则构造的合成题；v10 在同一项核对上是 P50 2.13 秒、P95 2.53 秒、最长 2.91 秒）。这不是最坏情况：这些提示词远短于护栏允许的长度，而 CPU 上的延迟随提示词变长而增加，护栏上限处的延迟没有在 v10 或 v10h 上测过。每次回落都记原因，并记下每个分数出自哪个评分器；回落率超过百分之几，说明有地方出了问题。
-- **任何基建变更后**（换量化、运行时或机器）：重跑 `python eval/run_exam.py`，对照[参考带](../eval/README.md)。脚本直接调用 ollama 的 `/api/generate`，不走 `POST /score`，而 Docker 参考服务器只发布 API 端口（怎样考它见该页）。默认按 v10 那套标签判卷：这份考卷没有咨询师标签，`--labels v10h`（默认）和 `--labels v10` 是同一套标签的两个名字（`eval/compare_quants.py` 有同一个 `--labels` 开关）。v10h 权重的合格带：维度级 84–90%、各维 ≥ 75%、A ≥ 81、JSON 合法率 ≥ 99%、危机闸门 10/10。A 的下限高于 v7 权重（这套标签上 A 为 80.5），但脚本按整数百分比打印（v7 显示 `A81%`），所以还要看维度级和 B（见 [eval/README.md](../eval/README.md)）。v10 权重的合格带：其余相同，A ≥ 86%。标签与 v10 的训练标签出自同一套教师提示词：通过只证明接线正确，不证明模型质量。
+- **预热**：模型每次（重）启动后先发一条预热请求，并保持 `keep_alive=-1`（`OllamaClient` 每次请求都带）。预热请求要用长超时，不要走 8 秒的客户端：客户端断开时 ollama 会中止加载，比超时更慢的加载永远完不成（只在人为限制 CPU 时复现过）。
+- **超时与回落**：调用设硬超时，并定义回落：旧评分器，或跳过这条消息（跳过等于无操作）。工具包与参考服务器默认 8 秒；运行 ollama 的 ARM CPU 服务器上，v10h q8 GGUF 每条消息 P50 2.09 秒、P95 2.57 秒、最长 2.87 秒（138 道按工具包截短规则构造的合成题；v10 在同一项核对上是 P50 2.13 秒、P95 2.53 秒、最长 2.91 秒）。这不是最坏情况：这些提示词远短于护栏允许的长度，而 CPU 上的延迟随提示词变长而增加，护栏上限处的延迟没有在 v10 或 v10h 上测过。每次回落都记原因，并记下每个分数出自哪个评分器；回落率超过百分之几，说明有地方出了问题。参考服务器本身没有回落。超时（默认 8 秒；要改就在 `api` 服务的 `environment` 里设 `SCORE_TIMEOUT`）或模型不在时，`POST /score` 返回 HTTP 500，正文是 `Internal Server Error`。回复解析不出来时返回 HTTP 200，`scores` 为 null。闸门命中时 `scores` 同样是 null，但 `crisis.triggered` 为 true：要先读 `crisis`，命中的转入你的危机处理路径。其余两种情况按跳过或回落处理。
+- **任何基建变更后**（换量化、运行时或机器）：重跑 `python eval/run_exam.py`，对照[参考带](../eval/README.md)。脚本直接调用 ollama 的 `/api/generate`，不走 `POST /score`，而 Docker 参考服务器只发布 API 端口（怎样考它见该页）。默认按 v10 那套标签判卷：这份考卷没有咨询师标签，`--labels v10h`（默认）和 `--labels v10` 是同一套标签的两个名字（`eval/compare_quants.py` 有同一个 `--labels` 开关）。v10h 权重的合格带：维度级 84–90%、各维 ≥ 75%、A ≥ 81、JSON 合法率 ≥ 99%、危机闸门 10/10。在 llama.cpp + Metal 上，A 的下限高于 v7 权重（这套标签上 A 为 80.5）；经 ollama 在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13）实测，模型已预热时，v7 的 A 是 81.0，正好压线。两种情况脚本都打印 `A81%`，所以还要看维度级和 B（见 [eval/README.md](../eval/README.md)）。v10 权重的合格带：其余相同，A ≥ 86%。标签与 v10 的训练标签出自同一套教师提示词：这份卷检查的是接线，不是模型质量。过关说明你的部署与考卷标签的一致程度和参考值相当、`num_predict` 没有设得过小，走的是工具包自己的提示词、采样与解析器，不是你的。它说明不了你跑的是哪个版本（v10 权重也过得了 v10h 的带），也不检查聊天模板和 `stop`：在 ollama 0.40.13 上，60 道题里缺了这两项的 ollama 标签读数相同。这两项用 `ollama show <tag> --template` 和 `--parameters` 核对。
+- **参考服务器**：`POST /score` 没有认证，compose 把 8080 端口发布在所有网卡上。请放在你自己的访问控制之后，或只在本机开放：把 `server/docker-compose.yml` 里 `api` 服务的 `ports` 改成 `"127.0.0.1:8080:8080"`。`GET /healthz` 给模型发一条短探测，收到非空回复就报 `ok`：它说明模型有应答，不说明分数能解析。它总是返回 HTTP 200，所以要读 `ok` 字段；模型忙时也可能报 false。
 
 ## 十条禁令
 
@@ -570,9 +602,9 @@ v10 另加**明确自杀意念规则**：消息含明确自杀意念时，A 封�
 
 ③ **不把模型当危机检测器**。它给一条消息的五个维度打分，不识别也不处理危机；它的分数，包括 W 在内，没有一个是危机信号。危机处理由模型之前的确定性代码负责：凡把消息送进模型的路径都要先过这一层，批量重评、按整次访问重评的路径也不例外；闸门命中时，这条消息不评分，也不得进入后续提示词携带的历史。`CrisisGate` 是一份关键词表，只是起点，不是完整筛查：新旧 W 安全卷共 189 道合成的「想死但求助」题里，它命中 107 题（56.6%）。请用你人群里的说法扩充词表并逐条测试，并考虑在闸门之后再加一道独立筛查；依赖它之前，先在自己的数据上量它的召回率。
 
-④ **不改提示词**。不加评分指令，不改格式：细则已烧进权重，框架与 `build_prompt` 不同的提示词（加指令、改字段名或顺序、把框架翻译成别的语言）即出分布，而且不会有任何提示。上下文给多少是另一回事（见禁令 ⑥）。
+④ **不改提示词**。不加评分指令，不改格式：细则已烧进权重，框架与 `build_prompt` 不同的提示词（加指令、改字段名或顺序、把框架翻译成别的语言）即出分布，而且不会有任何提示。上下文给多少是另一回事（见禁令 ⑥）。`build_prompt()` 不转义客户端文本：消息里带 `<|im_end|>` 和 `<|im_start|>` 就能结束自己这一轮、再开一轮，分数随之来自伪造的文字。调用 `score_message()` 或服务之前，请从消息和 history 的每个字段里去掉这两个标记，并重复到一个不剩：`<|im_<|im_end|>end|>` 去掉一遍后还会留下一个。分词器里其他特殊标记没有测过。参考服务器不会替你去掉。
 
-⑤ **不升温度，也不放任 `repeat_penalty` 用默认值**。ollama 默认的 `repeat_penalty 1.1` 会把分数推离 0（在 v10 上测得：q8 GGUF，旧 B 卷，legacy 答案，造分 3/104 → 15/104，B 符号翻转 93 题中 2 条 → 4 条）。须设温度 0、`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`：`OllamaClient` 每次请求都会带上，`TransformersClient` 用贪心解码并显式设 `repetition_penalty=1.0`；你自己的客户端也必须照做（详见 [eval/README.md](../eval/README.md)）。
+⑤ **不升温度，也不放任 `repeat_penalty` 用默认值**。`repeat_penalty 1.1`（ollama 0.32.9 及以前的默认值，0.32.10 起为 1.0）会把分数推离 0（在 v10 上测得：q8 GGUF，旧 B 卷，legacy 答案，造分 3/104 → 15/104，B 符号翻转 93 题中 2 条 → 4 条）。须设温度 0、`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`：`OllamaClient` 每次请求都会带上，`TransformersClient` 用贪心解码并显式设 `repetition_penalty=1.0`；你自己的客户端也必须照做（详见 [eval/README.md](../eval/README.md)）。
 
 ⑥ **不超出截断护栏喂上下文**。`build_prompt` 保留最近 3 轮、每轮 200 字，消息 500 字封顶：这是 CPU 的延迟预算，也是自检考卷所用的配置。它不是本页此前所说的「模型在训练里见过的」：v10 的训练行有 36.6% 上下文超过 3 轮。
 
