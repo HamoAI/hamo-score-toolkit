@@ -95,6 +95,7 @@ LABEL_KEYS = {"v10h": "labels", "v10": "labels", "v9": "labels_v9", "pre_v9": "l
 
 
 def main():
+    sys.stdout.reconfigure(errors="replace")  # a console without ✓ or → must not stop the exam
     ap = argparse.ArgumentParser()
     ap.add_argument("--base-url", default="http://127.0.0.1:11434")
     ap.add_argument("--model", default="hamo-score-0.6b")
@@ -107,7 +108,7 @@ def main():
     client = OllamaClient(base_url=args.base_url, model=args.model, timeout=30)
 
     # ---- Section 1: scoring ----
-    exam = [json.loads(l) for l in open(os.path.join(HERE, "synthetic_exam.jsonl"))]
+    exam = [json.loads(l) for l in open(os.path.join(HERE, "synthetic_exam.jsonl"), encoding="utf-8")]
     if args.limit:
         exam = exam[: args.limit]
     # v10h names v10's labels: print them as v10's, so this line cannot read as counselor labels.
@@ -145,7 +146,7 @@ def main():
 
     # ---- Section 2: crisis gate ----
     gate = CrisisGate()
-    cases = [json.loads(l) for l in open(os.path.join(HERE, "gate_cases.jsonl"))]
+    cases = [json.loads(l) for l in open(os.path.join(HERE, "gate_cases.jsonl"), encoding="utf-8")]
     wrong = [c["id"] for c in cases
              if gate.check(c["message"]).triggered != (c["expect"] == "triggered")]
     print(f"Section 2 — crisis gate: {len(cases)-len(wrong)}/{len(cases)} correct"

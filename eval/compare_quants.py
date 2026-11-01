@@ -144,6 +144,7 @@ def compare(a: dict, b: dict, gold: dict) -> None:
 
 
 def main() -> None:
+    sys.stdout.reconfigure(errors="replace")  # a console without Δ or ⚠️ must not stop the exam
     ap = argparse.ArgumentParser()
     ap.add_argument("--models", nargs="+", required=True,
                     help="two or more ollama tags, reference build first")
@@ -155,7 +156,7 @@ def main() -> None:
                          " (this exam has no counselor labels), v9 (for v9 builds) or pre_v9 (for v7 builds)")
     args = ap.parse_args()
 
-    exam = [json.loads(l) for l in open(os.path.join(HERE, "synthetic_exam.jsonl"))]
+    exam = [json.loads(l) for l in open(os.path.join(HERE, "synthetic_exam.jsonl"), encoding="utf-8")]
     if args.limit:
         exam = exam[: args.limit]
     gold = {q["id"]: q[LABEL_KEYS[args.labels]] for q in exam}

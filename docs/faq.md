@@ -2,7 +2,7 @@
 
 **EN** | [中文](#中文)
 
-For toolkit 0.4.0, which serves model **v10h**. Unless stated otherwise, numbers
+For toolkit 0.4.1, which serves model **v10h**. Unless stated otherwise, numbers
 are for the shipped q8 GGUF through llama.cpp with Metal on an Apple M1 Pro, at
 temperature 0 with `repeat_penalty 1.0`, `top_k 0`, `top_p 1.0`; v7, v9 and v10
 numbers are their shipped q8 GGUFs run the same way on the same exam files.
@@ -61,20 +61,40 @@ them: check with `ollama show <tag> --parameters`.
 
 **The first request after startup is slow / times out.**
 Cold start. Send one warm-up request after every model (re)start and keep
-`keep_alive=-1` (the toolkit's client sets it per request; client and
-reference server default to an 8-second hard timeout). Send the warm-up with a
-long timeout, not through an 8-second client: ollama aborts a load when the
-client disconnects, so a load slower than the timeout never finishes
-(reproduced only under an artificial CPU cap). If later requests are
-still slow, the usual cost is prompt prefill on a slow CPU — check the
-trimming guards.
+`keep_alive=-1` (the toolkit's client sets it per request; the client and
+the reference server's `POST /score` default to an 8-second hard timeout).
+Send the warm-up with a long timeout, not through an 8-second client: ollama
+aborts a load when the client disconnects, so a load slower than the timeout
+never finishes. On one Apple-silicon Mac (Docker under Colima, arm64 CPU, ollama
+0.40.13), this was reproduced only under an artificial CPU cap or a shortened
+timeout. If later requests are still slow, the usual cost is prompt prefill
+on a slow CPU — check the trimming guards.
+
+In the reference server (`server/docker-compose.yml`), the `setup` service warms
+the model during `docker compose up`, before `api` starts. After a crash or a
+reboot, `ollama` and `api` restart by themselves. `setup` does not run then, so
+a restarted `ollama` has no model loaded. `api`'s health check loads it, or the
+first request does if it loads within `SCORE_TIMEOUT` (8 s by default). The
+check calls `/healthz` every 60 s. `/healthz` scores a short probe with its
+own timeout (`HEALTHZ_TIMEOUT`, by default 60 s, or `SCORE_TIMEOUT` if that is
+longer), so it can finish a load slower than `SCORE_TIMEOUT`. A probe that took
+longer than `SCORE_TIMEOUT` returns 503 even if it finished loading the model;
+the next one passes if the model is fast enough.
+
+Measured on 2026-11-01 on one Apple-silicon Mac (Docker under Colima, arm64 CPU,
+ollama 0.40.13): after a VM restart with no request at all, the health check
+loaded the model about 61 s after `api` started. With `SCORE_TIMEOUT` set to
+0.7 s, shorter than the load (about 1.3 s there), 0 of 48 `POST /score` calls
+succeeded in 130 s without the health check: each one aborted the load. With it,
+calls failed until the first probe finished the load, then succeeded. Slow
+hardware itself was not tested.
 
 If you limit the ollama container with `cpuset`, set `LLAMA_ARG_THREADS` to the
 number of CPUs. On one Apple-silicon Mac (Docker under Colima, arm64 CPU, ollama
 0.40.13), limited to 2 of the VM's 4 CPUs and 1500 MiB, llama-server otherwise
 kept 4 threads: warm-up took 125 s against about 3 s, and `/score` was still
 returning 500 when the run was stopped more than 400 s later. With
-`LLAMA_ARG_THREADS=2` the stack was healthy in 11 s.
+`LLAMA_ARG_THREADS=2` the stack came up in 11 s.
 
 **The ollama process keeps growing in memory on a small machine.**
 On ollama 0.32.5 and 0.40.13 the bundled llama-server keeps a host-memory
@@ -84,7 +104,8 @@ prompt: on 0.32.5 on a 4 GB machine we saw the process grow from 1.3 GB to
 Setting `LLAMA_ARG_CACHE_RAM=0` in the ollama service environment stopped the
 growth (1,277 → 1,294 MB over the same 100 prompts) with median latency
 unchanged. The reference `server/docker-compose.yml` on `main` has set it since
-2026-10-31; the file at the `v0.4.0` tag does not.
+2026-10-31, and the file at the `v0.4.1` tag sets it too; the file at the
+`v0.4.0` tag does not.
 
 Measured on 2026-10-31 on one Apple-silicon Mac (Docker under Colima, arm64 CPU,
 ollama 0.40.13), with short one-line synthetic messages through `POST /score`: 100 distinct prompts grew the process by 975 MB with the
@@ -331,7 +352,7 @@ of the rubric and of future versions.
 
 # 中文
 
-对应工具包 0.4.0，参考服务器跑的是 **v10h**。除另有说明，数字都测于随包 q8 GGUF：llama.cpp + Metal（Apple M1 Pro），温度 0，`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`；v7、v9、v10 的数字是各自随包的 q8 GGUF 在同样条件、同一份考卷上跑的。「bf16」指 safetensors 经 MLX 运行。验收考卷的数字用每题的完整上下文，不经 `build_prompt` 截短；自检卷和 ARM 服务器上的核对则经过截短。「真实终评」是 453 轮真实对话，来自三位知情同意的内部员工，已假名化，按参照标签（出自按生产口径打分的 LLM 评分器，其中 5 轮经人工修正；不是咨询师的分数）判卷，不对外分发。其余考卷都是合成的。
+对应工具包 0.4.1，参考服务器跑的是 **v10h**。除另有说明，数字都测于随包 q8 GGUF：llama.cpp + Metal（Apple M1 Pro），温度 0，`repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`；v7、v9、v10 的数字是各自随包的 q8 GGUF 在同样条件、同一份考卷上跑的。「bf16」指 safetensors 经 MLX 运行。验收考卷的数字用每题的完整上下文，不经 `build_prompt` 截短；自检卷和 ARM 服务器上的核对则经过截短。「真实终评」是 453 轮真实对话，来自三位知情同意的内部员工，已假名化，按参照标签（出自按生产口径打分的 LLM 评分器，其中 5 轮经人工修正；不是咨询师的分数）判卷，不对外分发。其余考卷都是合成的。
 
 **为什么模板带空 `<think>` 块？** 模型的训练文本里，assistant 这一轮是一个空 think 块加 JSON。[`server/Modelfile`](../server/Modelfile) 的 `TEMPLATE` 预填了这个块，已发布的 q8 参考读数经 llama.cpp 用的就是它。请原样照抄。
 
@@ -343,11 +364,15 @@ ollama 0.32.5、0.40.12、0.40.13 默认会存下这段模板，但实际用 GGU
 
 请始终设置 `repeat_penalty 1.0`、`top_k 0`、`top_p 1.0`。`server/Modelfile` 和 `server/docker-compose.yml` 已写好，工具包的 `OllamaClient` 也在每次请求里带上（请求参数优先于 Modelfile）；自己写的客户端若不随请求带上这三项，就只剩 Modelfile 这一层；Modelfile 也漏写，就一层都没有。自检卷走的是工具包的客户端，查不出漏写这三项的 Modelfile——请用 `ollama show <tag> --parameters` 核对。
 
-**启动后第一条请求慢/超时？** 冷启动。每次（重新）加载模型后先预热一发，并保持 `keep_alive=-1`（工具包客户端每次请求都带；客户端与参考服务器默认 8 秒硬超时）。预热请求要用长超时，不要走 8 秒的客户端：客户端断开时 ollama 会中止加载，比超时更慢的加载永远完不成（只在人为限制 CPU 时复现过）。之后仍慢，通常是慢 CPU 上的 prefill 成本——检查截断护栏。
+**启动后第一条请求慢/超时？** 冷启动。每次（重新）加载模型后先预热一发，并保持 `keep_alive=-1`（工具包客户端每次请求都带；客户端与参考服务器的 `POST /score` 默认 8 秒硬超时）。预热请求要用长超时，不要走 8 秒的客户端：客户端断开时 ollama 会中止加载，比超时更慢的加载永远完不成。在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13），这只在人为限制 CPU 或缩短超时的情况下复现过。之后仍慢，通常是慢 CPU 上的 prefill 成本——检查截断护栏。
+
+参考服务器（`server/docker-compose.yml`）里，`setup` 服务在 `docker compose up` 期间预热模型，之后 `api` 才启动。崩溃或机器重启后，`ollama` 和 `api` 会自动重启。这时 `setup` 不再运行，所以重启后的 `ollama` 没有加载模型。模型由 `api` 的健康检查加载；能在 `SCORE_TIMEOUT`（默认 8 秒）内加载完的话，第一条请求也会加载。健康检查每 60 秒调用一次 `/healthz`。`/healthz` 用自己的超时（`HEALTHZ_TIMEOUT`，默认 60 秒；`SCORE_TIMEOUT` 更长时取后者）给一条短探测打分，所以能完成比 `SCORE_TIMEOUT` 更慢的加载。探测耗时超过 `SCORE_TIMEOUT` 时，即使它已把模型加载完也返回 503；模型够快的话，下一次就能通过。
+
+2026-11-01 在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13）实测：虚拟机重启后没有任何请求时，健康检查在 `api` 启动约 61 秒后加载了模型。把 `SCORE_TIMEOUT` 设成 0.7 秒（短于那台机器上约 1.3 秒的加载时间）后：没有健康检查时，130 秒内 48 次 `POST /score` 调用全部失败，每一次都中止了加载；有健康检查时，调用一直失败，直到第一次探测完成加载，之后就成功了。慢硬件本身没有测过。
 
 用 `cpuset` 限制 ollama 容器时，把 `LLAMA_ARG_THREADS` 设成 CPU 数。在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13），限制到虚拟机 4 个 CPU 中的 2 个和 1500 MiB 内存时，不设的话 llama-server 仍是 4 个线程：预热用了 125 秒（不限制时约 3 秒），运行超过 400 秒后停掉时 `/score` 仍在返回 500。设 `LLAMA_ARG_THREADS=2` 后 11 秒就绪。
 
-**小内存机器上，ollama 进程的内存越涨越高？** ollama 0.32.5 和 0.40.13 自带的 llama-server 有一个放在主机内存里的提示词缓存，默认开启（上限 8 GiB），每来一条不同的提示词就多占一份：在 0.32.5 上，我们在一台 4 GB 的机器上看到，100 条不同的提示词让进程从 1.3 GB 涨到 3.3 GB。在 ollama 服务的环境变量里设 `LLAMA_ARG_CACHE_RAM=0` 后不再增长（同样 100 条，1,277 → 1,294 MB），延迟中位数不变。`main` 上参考的 `server/docker-compose.yml` 自 2026-10-31 起设了这一项；`v0.4.0` 标签里的文件没有设。
+**小内存机器上，ollama 进程的内存越涨越高？** ollama 0.32.5 和 0.40.13 自带的 llama-server 有一个放在主机内存里的提示词缓存，默认开启（上限 8 GiB），每来一条不同的提示词就多占一份：在 0.32.5 上，我们在一台 4 GB 的机器上看到，100 条不同的提示词让进程从 1.3 GB 涨到 3.3 GB。在 ollama 服务的环境变量里设 `LLAMA_ARG_CACHE_RAM=0` 后不再增长（同样 100 条，1,277 → 1,294 MB），延迟中位数不变。`main` 上参考的 `server/docker-compose.yml` 自 2026-10-31 起设了这一项，`v0.4.1` 标签里的文件也设了；`v0.4.0` 标签里的文件没有设。
 
 2026-10-31 在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13）用较短的单行合成消息（经 `POST /score`）实测：100 条不同的提示词，缓存开着时进程涨了 975 MB，关掉时涨了 2.3 MB，请求耗时中位数不变。增长幅度取决于提示词长度。在 4 GiB 内存限制、2 个 CPU、`LLAMA_ARG_THREADS=2` 下，缓存开着时，一遍串行的 `POST /score` 在第 182 条消息时运行进程因内存不足被杀，另一遍考卷因 HTTP 500 中断。同样的限制下关掉缓存，195 条全部返回，没有进程被杀，考卷 86.5%，ollama 容器峰值约 1.3 GiB。这些是容器限制，不是真正的小内存机器。
 

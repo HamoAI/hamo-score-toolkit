@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from .prompt import strip_turn_markers
+
 ZH_CRISIS = [
     "自杀", "自残", "不想活", "想死", "去死", "结束生命", "结束自己",
     "活不下去", "活着没意思了", "割腕", "跳楼", "安眠药", "烧炭",
@@ -46,6 +48,7 @@ class CrisisGate:
         self.keywords = ZH_CRISIS + EN_CRISIS + (extra_keywords or [])
 
     def check(self, message: str) -> CrisisResult:
-        low = (message or "").lower()
+        # Read what the model would read: a marker must not split a phrase past the gate.
+        low = strip_turn_markers(message or "").lower()
         hits = [k for k in self.keywords if k.lower() in low]
         return CrisisResult(triggered=bool(hits), matched=hits)

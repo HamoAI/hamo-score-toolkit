@@ -1,0 +1,3 @@
+graft eval
+graft server
+global-exclude __pycache__ *.py[cod]

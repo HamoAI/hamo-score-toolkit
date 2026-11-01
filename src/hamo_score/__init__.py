@@ -22,14 +22,14 @@ scores into update_stress() — see stress.py.
 """
 from .client import OllamaClient, TransformersClient, ScoreResult, score_message
 from .parse import parse_scores, DIMS
-from .prompt import build_prompt, STUDENT_PROMPT
+from .prompt import build_prompt, strip_turn_markers, STUDENT_PROMPT
 from .safety import CrisisGate, CrisisResult, DISCLOSURE_EN, DISCLOSURE_ZH
 from .stress import energy_state, update_stress
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 __all__ = [
     "OllamaClient", "TransformersClient", "ScoreResult", "score_message",
-    "parse_scores", "DIMS", "build_prompt", "STUDENT_PROMPT",
+    "parse_scores", "DIMS", "build_prompt", "strip_turn_markers", "STUDENT_PROMPT",
     "CrisisGate", "CrisisResult", "DISCLOSURE_EN", "DISCLOSURE_ZH",
     "energy_state", "update_stress",
 ]

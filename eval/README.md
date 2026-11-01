@@ -52,6 +52,12 @@ script prints `v10 labels` for both. `--labels` picks the labels, not the band: 
 deployment by the v10h band and a v10 deployment by the v10 band (their A floors differ; see
 below).
 
+> **0.4.1**：考卷、标签和合格带都没有变。`build_prompt()` 现在会去掉 `<|im_start|>` 和 `<|im_end|>`；
+> 不含这两个标记的文本，提示词没有变化。
+>
+> **0.4.1**: the exam, its labels and the bands are unchanged. `build_prompt()` now removes
+> `<|im_start|>` and `<|im_end|>`; for text without them the prompt is unchanged.
+>
 > **0.4.0**：参考服务器改跑 v10h，它的合成标签由 Hamo 请的真人咨询师重新打分；库的行为没有变化。从 0.3.x 升级时，
 > `--labels` 的默认名字由 `v10` 变成 `v10h`，判卷用的标签字段没变，`--labels v10` 仍然可用。变的是合格带：
 > v10h 的 A 下限是 81，v10 的是 86。服务端还在跑 v10 的，继续按 v10 的带判。
@@ -150,10 +156,13 @@ v10h 的架构、量化和文件大小与 v10 相同。
   `A82% W83% E83% H95% B90%`，不是 llama.cpp + Metal 参考的 `A83%`。同样 195 题走 `POST /score`：86.7%，195 题的五个分数
   全部相同。如果考卷第一题就是模型加载后的第一条请求：86.4%（A 82.6 · W 82.6 · E 82.6 · H 94.9 · B 89.2），不同读数 99 种，
   同样在带内；第一题之前多一条请求（compose 的预热，或 `/healthz` 探测）得到的是预热后的读数。两种状态有 11 题读数不同，
-  其中 1 题相差超过 ±0.5。2026-11-01 从同一状态出发、同样顺序的 195 题，重跑得到相同的读数；同一条消息连发两次则不一定（设置相同、交替调用时 60 题有 57 题一致）。对 llama.cpp + Metal，同样 195 题：
+  其中 1 题相差超过 ±0.5。2026-11-01 从同一状态出发、同样顺序的 195 题，重跑得到相同的读数；同一条消息连发两次则不一定（设置相同、交替调用时 60 题有 57 题一致）。
+  2026-11-01 开着 `api` 的健康检查（每 60 秒一次探测）跑的两遍同样是 86.7%：195 题的读数两遍之间相同，也与 2026-10-31
+  没有健康检查的那一遍相同，所以在这两遍里探测没有改变读数。
+  对 llama.cpp + Metal，同样 195 题：
   模型已预热时五个分数完全相同 184 题，五维都在 ±0.5 内 195 题；从刚加载的状态开始是 182 与 194 题。缓存关闭、模型已预热时，ollama
   0.32.5、0.40.12、0.40.13 在这 195 题上的回答逐字节相同。这些运行用的是 GGUF 自带的聊天模板，不是上表 q8 一列经 llama.cpp
-  用的 `server/Modelfile` 模板（见 [FAQ](../docs/faq.md)）。上述差异的原因没有查。compose 跟随 `ollama/ollama:latest`，当时是 0.40.13。这是一台机器上的一次记录，没有 x86 上的记录。
+  用的 `server/Modelfile` 模板（见 [FAQ](../docs/faq.md)）。上述差异的原因没有查。compose 固定用 `ollama/ollama:0.40.13`，就是上面 0.40.13 那些运行所用的镜像（摘要相同）。这是一台机器上的一次记录，没有 x86 上的记录。
 
 **合格带。** 维度级 84–90% 定于 2026-10-05，v10h 沿用（参考值 86.7%，上下约 3 个点）。A 的下限 2026-10-30 按
 v10h 定为 81；v10 仍是 86（见「部署的是 v10、v9 或 v7？」）。延迟取决于你的硬件，不属于合格带。
@@ -220,13 +229,17 @@ Docker; v10h has the same architecture, quantization and file size.
   question (compose's warm-up, or the `/healthz` probe) gave the warmed reading. The two states
   differ on 11 of the 195 answers, one of them by more than ±0.5. On 2026-11-01, repeat passes of the
   same 195 prompts in the same order, from the same state, gave the same answers; one message sent twice in
-  a row need not (with identical settings, alternating calls agreed on 57 of 60). Against llama.cpp + Metal on the same
+  a row need not (with identical settings, alternating calls agreed on 57 of 60). Two passes on
+  2026-11-01 with `api`'s health check running (one probe every 60 s) read 86.7% again: the same
+  read-outs on all 195 as each other and as the pass recorded on 2026-10-31 without it, so the
+  probe did not move a read-out in those passes. Against llama.cpp + Metal on the same
   195: identical five-score read-out on 184 and all five within ±0.5 on all 195 with the model
   warmed, 182 and 194 from a fresh load. With the cache off and the model warmed, ollama 0.32.5,
   0.40.12 and 0.40.13 gave byte-identical answers on all 195. These runs use the GGUF's own chat template, not the
   `server/Modelfile` template that the q8 column used through llama.cpp (see the
-  [FAQ](../docs/faq.md)). The cause of these differences was not investigated. Compose tracks
-  `ollama/ollama:latest`, which was 0.40.13 on that date. This is one record on one machine; there
+  [FAQ](../docs/faq.md)). The cause of these differences was not investigated. Compose pins
+  `ollama/ollama:0.40.13`, the image of the 0.40.13 runs above
+  (same digest). This is one record on one machine; there
   is no x86 run.
 
 **The band.** The 84–90% band was set on 2026-10-05 and v10h keeps it (reference 86.7%, about ±3

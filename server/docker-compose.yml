@@ -1,4 +1,4 @@
-# One-command reference deployment:  docker compose up
+# One-command reference deployment:  docker compose up --build
 # Services: ollama (model runtime) + setup (one-shot: fetch GGUF from HF, create model) + api (FastAPI /score)
 # Serves hamo-score-0.6b v10h. To serve an earlier version instead, replace every hamo-score-0.6b-v10h.q8.gguf below with the
 # file name, and both sha256 digests with the digest, of the version you want:
@@ -15,12 +15,16 @@
 # judged against v10's own band in eval/README.md), --labels v9 (v9) or --labels pre_v9 (v7).
 # run_exam.py calls ollama's /api/generate directly and this file publishes only port 8080: see eval/README.md
 # for how to expose the ollama service to the exam.
-# To restart the containers, use `docker compose stop` then `start`. With this file unchanged, `docker compose up -d` restarts nothing: it re-runs `setup`, which warms the model.
+# ollama and api restart by themselves after a crash or a reboot, and stay stopped after `docker compose stop`. setup does not restart
+# with them, so after a reboot or an ollama crash the model comes back unloaded: api's health check (every 60 s) reloads it, or the first request does if it loads in time.
+# To restart the containers by hand, use `docker compose stop` then `start`. With this file unchanged, `docker compose up -d` restarts nothing: it re-runs `setup`, which warms the model.
 # After you edit this file, run `docker compose up -d`: it recreates the changed services, and `stop` and `start` do not apply the edit.
-# Plain `docker compose restart` can leave `setup` failed and the model cold; the first request then loads the model (a load slower than the 8-second timeout does not finish, see docs/faq.md), and `docker compose up -d` repairs it.
+# After you pull a newer version of this repository, run `docker compose up -d --build`: without --build, api keeps its old image.
+# Plain `docker compose restart` can leave `setup` failed and the model unloaded (reloaded as above); api keeps serving, and `docker compose up -d` repairs `setup`.
 services:
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.40.13
+    restart: unless-stopped
     environment:
       # llama-server's prompt cache grows with every distinct prompt, up to 8 GiB by default. Off, memory stays flat.
       LLAMA_ARG_CACHE_RAM: "0"
@@ -34,7 +38,7 @@ services:
       retries: 20
 
   setup:
-    image: curlimages/curl:latest
+    image: curlimages/curl:8.23.0
     # The image runs as the non-root curl_user, but the model-cache volume is root-owned: writing the GGUF needs root.
     user: "0:0"
     depends_on:
@@ -48,12 +52,14 @@ services:
       - |
         set -e
         if [ ! -f /models/hamo-score-0.6b-v10h.q8.gguf ]; then
-          echo "downloading GGUF (639MB, one-time)..."
-          curl -L --fail -o /models/hamo-score-0.6b-v10h.q8.gguf \
+          echo "downloading GGUF (639MB, once per model-cache volume)..."
+          # Under a temporary name, so a stopped download leaves nothing the next run would trust.
+          curl -L --fail -o /models/hamo-score-0.6b-v10h.q8.gguf.part \
             https://huggingface.co/HamoAI/hamo-score-0.6b/resolve/main/gguf/hamo-score-0.6b-v10h.q8.gguf
+          mv /models/hamo-score-0.6b-v10h.q8.gguf.part /models/hamo-score-0.6b-v10h.q8.gguf
         fi
         # /api/create takes blob digests, not paths: upload the GGUF as a blob first
-        # (a digest mismatch — e.g. a truncated download — fails here with HTTP 400).
+        # (a digest mismatch, as from a partial file left by an older compose file, fails here with HTTP 400).
         echo "uploading GGUF blob to ollama..."
         curl -sS --fail -T /models/hamo-score-0.6b-v10h.q8.gguf -X POST \
           http://ollama:11434/api/blobs/sha256:3b5a5999a79f5cca917c24583779f67375d477aae6834e2443137f6ee738fb88
@@ -73,6 +79,7 @@ services:
     build:
       context: ..
       dockerfile: server/Dockerfile
+    restart: unless-stopped
     depends_on:
       setup:
         condition: service_completed_successfully
@@ -80,7 +87,15 @@ services:
       OLLAMA_URL: http://ollama:11434
       SCORE_MODEL: hamo-score-0.6b
     ports:
-      - "8080:8080"
+      # Loopback only: /score has no authentication. Before you widen it, see the Authentication note in the README.
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      # /healthz scores a probe with a long timeout, so this also reloads the model after a restart.
+      # These 70 and 75 must stay above HEALTHZ_TIMEOUT (60 s, or SCORE_TIMEOUT if that is longer).
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=70)"]
+      interval: 60s
+      timeout: 75s
+      retries: 3
 
 volumes:
   ollama-data:

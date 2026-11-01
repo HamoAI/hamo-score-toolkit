@@ -10,7 +10,9 @@ it requires an explicit, greppable ``unsafe_disable_crisis_gate=True``.
 """
 from __future__ import annotations
 
+import io
 import json
+import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -36,6 +38,26 @@ from .safety import CrisisGate, CrisisResult
 SAMPLING_OPTIONS = {"temperature": 0, "repeat_penalty": 1.0, "top_k": 0, "top_p": 1.0}
 
 
+def _error_text(body: bytes) -> str:
+    """The text of an error response: ollama's ``error`` field, else the raw body."""
+    text = body.decode("utf-8", "replace")
+    try:
+        return str(json.loads(text)["error"])[:300]
+    except (ValueError, KeyError, TypeError, RecursionError):
+        return text[:300]
+
+
+def _with_reason(e: urllib.error.HTTPError) -> urllib.error.HTTPError:
+    """The same error with the server's reason in its message; the body stays readable."""
+    try:
+        body = e.read()
+    except Exception:
+        return e
+    reason = _error_text(body)
+    return urllib.error.HTTPError(e.url, e.code, f"{e.msg}: {reason}" if reason else e.msg,
+                                  e.headers, io.BytesIO(body))
+
+
 class OllamaClient:
     """Scores via a local/remote ollama server (or any /api/generate clone)."""
 
@@ -51,8 +73,12 @@ class OllamaClient:
         req = urllib.request.Request(
             f"{self.base_url}/api/generate", json.dumps(payload).encode(),
             {"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=self.timeout) as r:
-            return json.loads(r.read()).get("response", "")
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                return json.loads(r.read()).get("response", "")
+        except urllib.error.HTTPError as e:
+            # urllib's message is only the status line; the reason is in ollama's body.
+            raise _with_reason(e) from None
 
 
 class TransformersClient:

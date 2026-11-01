@@ -857,7 +857,9 @@ In production, set `keep_alive=-1` and send one warm-up request after every
 restart (the toolkit's `OllamaClient` already sends `keep_alive=-1` per
 request). Send the warm-up with a long timeout, not through an 8-second
 client: ollama aborts a load when the client disconnects, so a load slower
-than the timeout never finishes (reproduced only under an artificial CPU cap).
+than the timeout never finishes. On one Apple-silicon Mac (Docker under Colima,
+arm64 CPU, ollama 0.40.13), this was reproduced only under an artificial CPU
+cap or a shortened timeout; slow hardware itself was not tested.
 
 Compare the served model with the evaluated one, item by item, before you
 trust either: the same GGUF can score differently in another runtime, which
@@ -1636,7 +1638,8 @@ GGUF，而从下载的仓库副本转换，310 张张量相同，文件头元数
 3/104（2.9%）升到 15/104（14.4%），符号翻转从 2 条变成 4 条；此前公布过的实测
 方向都相同（见 [`eval/README.md`](../eval/README.md)）。生产设 `keep_alive=-1`、
 重启后预热一发。预热请求要用长超时，不要走 8 秒的客户端：客户端断开时 ollama 会中止
-加载，比超时更慢的加载永远完不成（只在人为限制 CPU 时复现过）。
+加载，比超时更慢的加载永远完不成。在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13），
+这只在人为限制 CPU 或缩短超时的情况下复现过，慢硬件本身没有测过。
 
 **把「服务出来的模型」和「评测用的模型」逐题对一遍**：同一个 GGUF 换个运行环境
 可能打出不同的分。v10 对一台跑 ollama 的 ARM CPU 服务器做过两项核对：100 道
