@@ -233,9 +233,10 @@ are the wrong headline number.
 label training data (we use `deepseek-chat` with the production rubric; label
 at temperature 0 — our corpora through v6.1 were labelled at a non-zero
 temperature, and re-labelling the corpus at temperature 0 was the main change
-in v7), make it sit your real exam first. Our bar on 440 real turns:
-dimension-level ±0.5 agreement ~89% (88.7%), decision-level 97.5%. Look at
-per-dimension numbers, not just the mean: our teacher first scored 72% on the
+in v7), make it sit your real exam first. Our line on 440 real turns was 90%
+dimension-level ±0.5 agreement; the teacher reached 88.7% and passed conditionally.
+Its decision-level agreement on the same turns, worked out a day later, was 97.5%.
+Look at per-dimension numbers, not just the mean: our teacher first scored 72% on the
 Boundary dimension — a fixable operational-definition mismatch, closed to 78%
 (90% at ±1.0) with calibration notes in the rubric prompt. A broken dimension
 hides comfortably inside a good average. A bulk re-label can also silently
@@ -1404,7 +1405,7 @@ v8.1、v9、v9L、v10；注册里算作第七次），参照检查点、消融�
 连同消息、上下文、金标一起，**记录当时的压力值等决策上下文**——否则算不了决策级。
 
 教师资格考：给训练数据打标的模型（我们用 deepseek-chat + 生产量表，temperature
-0）先考你的真题，我们的线：维度级 ±0.5 约 89%、决策级 97.5%；要逐维看——我们教师
+0）先考你的真题。我们的线是维度级 ±0.5 90%，教师考到 88.7%，有条件通过；同一批题第二天算出的决策级是 97.5%。要逐维看——我们教师
 B 维初考 72%，靠量表校准注记修到 78%，平均数会把坏维度藏起来。整体重标可能悄悄
 撤销早先的修复：v7 的重标丢掉了一条 W 规则（绝望后跟行动仍保持 W ≥ 1.5），v9 的
 W 安全修复把它补回（连同新规则「求助不抵消自杀意念，W ≥ 2.5」上调 285 行）。
