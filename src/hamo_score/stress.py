@@ -1,7 +1,7 @@
 """Reference implementation of the downstream state math.
 
 AWEHB scores are per-message signals and are NOT meant to be consumed raw.
-In Hamo's production engine they feed deterministic code: an exponential
+They feed deterministic code: an exponential
 blend smooths per-message noise ~5×, and the smoothed stress maps to one of
 three energy states that gate how deep a conversation may go. This module is
 that pattern, released as a reference — we recommend the same shape in any
@@ -14,6 +14,18 @@ same formula and cites this module as the reference implementation):
 
 Version caveat: these weights and the 4.0 / 7.0 cut-offs in energy_state() were
 set on scores from the legacy rubrics (v7 and earlier).
+
+v12 is v10h's prompts and training recipe with the synthetic training labels
+replaced by the third-round scores of a review by human counselors engaged by
+Hamo (v10h, below, was trained on its first round). On our 453-turn real final
+exam the mean raw per-turn stress change computed from v12's read-outs is
+-0.61, against -0.68 from the reference labels and -0.63 from v10h (each
+version's shipped q8, llama.cpp + Metal, same exam and settings). Replaying
+sessions of three or more turns, v12 ends 0.12 below the reference labels on
+average (session-replay drift -0.12; v10h -0.14; the pre-registered limit was
+±0.15). v12 scores B 0 on 188 of the 453 turns (v10h: 201), and its A reads
+lower on real messages (mean A 0.40; v10h: 0.43; reference labels: 0.84), so
+check the buckets on your own data before they gate anything.
 
 v10h is v10's prompts and training recipe with the synthetic training labels
 re-scored by human counselors engaged by Hamo. On our 453-turn real final exam
@@ -39,9 +51,14 @@ v9 scored B under a narrower ("crisp") rubric: B is 0 on most turns, the relief
 term vanishes, and the same computation gives +0.37 per turn (replay drift
 +0.51), so stress drifts upward. Re-tuning the cut-offs or the B weight does not repair that (a weight
 multiplies a zero), and earlier advice here to "re-tune for v9" was not enough.
-Do not feed v9 scores into this module; use v10h, v10 or v7.
+Do not feed v9 scores into this module; use v12, v10h, v10 or v7.
 
 版本注意：上述权重与 energy_state() 的 4.0 / 7.0 阈值按 legacy 口径（v7 及更早）的分数定。
+v12 沿用 v10h 的提示词和训练配方，合成训练行的标签换成 Hamo 请的真人咨询师复核第三轮的分数（下面的 v10h 用的是
+第一轮）。在 453 轮真实终评上，按 v12 的读数算出的平均每轮原始压力变化是 -0.61，参照标签是 -0.68，v10h 是 -0.63
+（都是各版本随包 q8，llama.cpp + Metal，同一套考卷与设置）；按会话回放（三轮及以上），v12 的末值平均比参照标签低 0.12
+（回放漂移 -0.12，v10h 为 -0.14；预注册界限 ±0.15）。453 轮里 v12 有 188 轮的 B 打 0（v10h 201 轮）；它的 A 在真实
+消息上读数更低（A 均值 0.40，v10h 0.43，参照标签 0.84），让分桶把关任何事之前请先用你自己的数据核对。
 v10h 沿用 v10 的提示词和训练配方，合成训练行的标签换成 Hamo 请的真人咨询师复核后的分数。在 453 轮真实终评上，
 按 v10h 的读数算出的平均每轮原始压力变化是 -0.63，参照标签是 -0.68，v10 是 -0.72（都是各版本随包 q8，
 llama.cpp + Metal，同一套考卷与设置）；按会话回放（三轮及以上），v10h 的末值平均比参照标签低 0.14（回放漂移 -0.14，
@@ -53,7 +70,7 @@ v10 的 B 回到 legacy 口径：在 453 轮真实终评上，按 v10 的读数�
 与定阈值时的 A 不同，让分桶把关任何事之前请先用你自己的数据核对。
 v9 的 B 用的是更窄的 crisp 口径，多数轮次为 0，减压项消失，同样的计算得到每轮 +0.37（回放漂移 +0.51），压力会
 持续上漂。重调阈值或 B 的权重都救不回来（权重乘的是 0）；此处早先「为 v9 重调」的建议并不够。
-不要把 v9 的分数喂给本模块，请用 v10h、v10 或 v7。
+不要把 v9 的分数喂给本模块，请用 v12、v10h、v10 或 v7。
 """
 from __future__ import annotations
 

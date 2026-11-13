@@ -11,17 +11,19 @@ acceptance"**.
 ```bash
 python eval/run_exam.py
 python eval/run_exam.py --base-url http://myhost:11434 --model my-tag
+python eval/run_exam.py --labels v10h
 python eval/run_exam.py --labels v10
 python eval/run_exam.py --labels v9
 python eval/run_exam.py --labels pre_v9
 ```
 
-第一行连 localhost:11434 上的 ollama，默认 `--labels v10h`，也就是 v10 那一套标签。第二行用于别的地址或模型名。`--labels v10` 用于部署
-v10（标签相同，按 v10 的带判）。`--labels v9` 和 `--labels pre_v9` 用于有意部署 v9 或 v7。
+第一行连 localhost:11434 上的 ollama，默认 `--labels v12`，也就是 v10 那一套标签。第二行用于别的地址或模型名。`--labels v10h`
+和 `--labels v10` 用于部署 v10h 或 v10（标签相同，各按自己的带判）。`--labels v9` 和 `--labels pre_v9` 用于有意部署 v9 或 v7。
 
-The first line expects ollama on localhost:11434 and defaults to `--labels v10h`, which is v10's label
-set. The second is for another host or model name. `--labels v10` is for serving v10 (same labels,
-judged by v10's band). `--labels v9` and `--labels pre_v9` are for serving v9 or v7 on purpose.
+The first line expects ollama on localhost:11434 and defaults to `--labels v12`, which is v10's label
+set. The second is for another host or model name. `--labels v10h` and `--labels v10` are for serving
+v10h or v10 (same labels, each judged by its own band). `--labels v9` and `--labels pre_v9` are for
+serving v9 or v7 on purpose.
 
 这些命令直接调 ollama 的 `/api/generate`，不走 `POST /score`。参考的 `server/docker-compose.yml` 只发布
 8080 端口：要考它，给 `ollama` 服务加 `ports: ["127.0.0.1:11435:11434"]`，在 `server/` 下运行 `docker compose up -d`，再回到仓库根目录，加
@@ -35,23 +37,39 @@ ollama's model of the same name.
 
 | `--labels` | 字段 · key | A | B | 用于 · for |
 |---|---|---|---|---|
-| `v10h`（默认 · default） | `labels` | 口径 v8 · rubric v8 | legacy | v10h |
+| `v12`（默认 · default） | `labels` | 口径 v8 · rubric v8 | legacy | v12 |
+| `v10h` | `labels` | 口径 v8 · rubric v8 | legacy | v10h |
 | `v10` | `labels` | 口径 v8 · rubric v8 | legacy | v10 |
 | `v9` | `labels_v9` | 口径 v8 · rubric v8 | crisp | v9 |
 | `pre_v9` | `labels_pre_v9` | 旧口径 · old rubric | legacy | v7 |
 
-**`v10h` 和 `v10` 是同一套标签的两个名字。** 这 195 题没有咨询师标签：v10h 的合成训练标签由 Hamo 请的真人
-咨询师重新打过分，这份考卷没有，所以 v10h 也按 v10 那套标签判卷。两个名字算出的数字完全相同，脚本打印的都是
-`v10 labels`。`--labels` 只选标签，不选合格带：部署 v10h 就看 v10h 的带，部署 v10 就看 v10 的带（A 的下限不同，
-见下）。
+**`v12`、`v10h` 和 `v10` 是同一套标签的三个名字。** 这 195 题没有咨询师标签：v10h 和 v12 的合成训练标签来自
+Hamo 请的真人咨询师的复核（v10h 用第一轮的分，v12 用第三轮的），这份考卷没有经过复核，所以 v12 和 v10h 都按 v10
+那套标签判卷。三个名字算出的数字完全相同，脚本打印的都是 `v10 labels`。`--labels` 只选标签，不选合格带：部署
+v12 就看 v12 的带，部署 v10h 就看 v10h 的带，部署 v10 就看 v10 的带（v12 的维度级带与另两个不同，v10 的 A 下限
+与另两个不同，见下）。
 
-**`v10h` and `v10` are two names for one label set.** These 195 questions have no counselor
-labels: v10h's synthetic training labels were re-scored by human counselors engaged by Hamo, this
-exam was not, so v10h is graded on v10's labels. Both names give exactly the same numbers, and the
-script prints `v10 labels` for both. `--labels` picks the labels, not the band: judge a v10h
-deployment by the v10h band and a v10 deployment by the v10 band (their A floors differ; see
-below).
+**`v12`, `v10h` and `v10` are three names for one label set.** These 195 questions have no
+counselor labels: the synthetic training labels of v10h and v12 come from a review by human
+counselors engaged by Hamo (v10h's from its first round, v12's from its third), and this exam was
+not reviewed, so v12 and v10h are graded on v10's labels. All three names give exactly the same
+numbers, and the script prints `v10 labels` for each. `--labels` picks the labels, not the band:
+judge a v12 deployment by the v12 band, a v10h deployment by the v10h band and a v10 deployment by
+the v10 band (v12's dimension-level band differs from the other two, and v10's A floor from the
+other two; see below).
 
+> **0.5.0**：参考服务器改跑 v12，它用咨询师第三轮的分训练；库的行为没有变化。考卷和标签都没有变。从 0.4.x
+> 升级时，`--labels` 的默认名字由 `v10h` 变成 `v12`，判卷用的标签字段没变，`--labels v10h` 和 `--labels v10`
+> 仍然可用。变的是合格带：v12 的维度级带是 82–88%（v10h 和 v10 是 84–90%），其余各条与 v10h 相同。服务端还在跑
+> v10h 的，继续按 v10h 的带判。
+>
+> **0.5.0**: serves v12, trained on the counselors' third-round scores; no change to the library's
+> behaviour. The exam and its labels are unchanged. Coming from 0.4.x, the default `--labels` name
+> changes from `v10h` to `v12`; the label key graded against is the same, and `--labels v10h` and
+> `--labels v10` still work. What changes is the band: v12's dimension-level band is 82–88% (v10h's
+> and v10's are 84–90%), and its other lines are v10h's. If your server still serves v10h, keep
+> judging it by v10h's band.
+>
 > **0.4.1**：考卷、标签和合格带都没有变。`build_prompt()` 现在会去掉 `<|im_start|>` 和 `<|im_end|>`；
 > 不含这两个标记的文本，提示词没有变化。
 >
@@ -69,20 +87,23 @@ below).
 > keep judging it by v10's band.
 >
 > **从 0.2.0 升级注意**：那时默认的 v9 标签存在 `labels` 字段；0.3.0 起 `labels` 是 v10 标签，v9 标签挪到
-> `labels_v9`。仍在跑 v9 的部署必须显式加 `--labels v9`，否则读数落在 v10h 和 v10 的合格带之外；跑 v7 的照旧加
+> `labels_v9`。仍在跑 v9 的部署必须显式加 `--labels v9`，否则读数落在 v12、v10h 和 v10 的合格带之外；跑 v7 的照旧加
 > `--labels pre_v9`。
 >
 > **Upgrading from 0.2.0**: there the default v9 labels were stored under `labels`. From 0.3.0
 > `labels` holds the v10 labels and the v9 labels moved to `labels_v9`. A deployment that still
-> serves v9 must pass `--labels v9` explicitly, or it reads outside the v10h and v10 bands; a v7
-> deployment passes `--labels pre_v9` as before.
+> serves v9 must pass `--labels v9` explicitly, or it reads outside the v12, v10h and v10 bands; a
+> v7 deployment passes `--labels pre_v9` as before.
 
 W/E/H 标签三套相同。分数跨版本不能直接比：A 在 v9 换了口径（v10 沿用），B 在 v9 改成 crisp、v10 改回
-legacy；v10h 的 A、W 平均读得比 v10 低，全零输出也更少。
+legacy；v10h 的 A、W 平均读得比 v10 低，全零输出也更少；v12 的合成训练标签换成了咨询师第三轮的分，在真实终评上，
+它的 A、E、B 平均又比 v10h 略低。
 
 W/E/H labels are the same in all three sets. Scores are not comparable across versions: A changed
 rubric at v9 (v10 keeps it); B went to crisp at v9 and back to legacy at v10; v10h's A and W read
-lower on average than v10's, and its all-zero outputs are fewer.
+lower on average than v10's, and its all-zero outputs are fewer; v12 is trained on the counselors'
+third-round scores, and on the real final exam its A, E and B read a little lower on average than
+v10h's.
 
 ## 考卷构成 · What's inside
 
@@ -93,7 +114,8 @@ lower on average than v10's, and its all-zero outputs are fewer.
   2.5）没有改动任何标签。
 - **与训练语料的关系**：195 题里有 6 题的消息与某条 v10 训练样本的最新消息文字相同；没有一道题的完整提示词
   与训练样本相同。此前本页写「与所有训练语料不相交」，说得过满。v10h 的训练行全部取自 v10，提示词不变，这项
-  核对没有重做，所以 6 题对 v10h 是上限。
+  核对没有重做，所以 6 题对 v10h 是上限。v12 的训练行与 v10h 的提示词、行序完全相同，只换了合成行的答案，所以
+  6 题对 v12 同样是上限。
 - **闸门区 `gate_cases.jsonl`（10 题）**：手写危机句式 7 条（中英），加不应误触的 3 条（2 条带「死」字的
   夸张、1 条普通日常消息）。这一节不调用模型，只在进程内跑工具包的 `CrisisGate` 关键词表，与模型版本无关。
 
@@ -108,13 +130,157 @@ lower on average than v10's, and its all-zero outputs are fewer.
 - **Relation to the training data**: 6 of the 195 messages also occur as the latest message of a
   v10 training row; no full prompt is shared. This page used to say "disjoint from all training
   corpora", which was too strong. v10h's training rows are all taken from v10's, with the same
-  prompts; the check was not repeated, so six is an upper bound for v10h.
+  prompts; the check was not repeated, so six is an upper bound for v10h. v12's training rows have
+  v10h's prompts in v10h's order, with new answers on the synthetic rows only, so six is an upper
+  bound for v12 too.
 - **Gate section, `gate_cases.jsonl` (10 cases)**: 7 handwritten crisis phrasings (zh and en) and
   3 messages that must not trigger (two hyperboles using 死, one plain everyday message). It
   calls no model: it runs the toolkit's `CrisisGate` keyword lists in-process and does not depend
   on the model version.
 
+## 官方参考数字 · Official reference (v12, 默认标签 · default labels)
+
+| 指标 · Metric | bf16（MLX） | q8（llama.cpp + Metal） | 合格带 · Pass band |
+|---|---|---|---|
+| JSON 合法率 · JSON validity | 100.0% | 100.0% | ≥ 99% |
+| 维度级一致率（±0.5）· Dim-level agreement | 84.7% | 84.7% | **82–88%** |
+| A | 83.1 | 83.1 | **≥ 81** |
+| W · E · H · B | 80.0 · 77.9 · 94.9 · 87.7 | 79.5 · 79.0 · 93.3 · 88.7 | 各 ≥ 75 · each ≥ 75 |
+| 不同读数种类 · Distinct read-outs | 77 | 81 | — |
+| 闸门区 · Crisis gate（不调用模型 · no model call） | 10/10 | 10/10 | 10/10（硬性 · hard） |
+
+**基准。** 两列都用工具包自己的 `build_prompt()` 与 `parse_scores()`，每题最多 80 个新 token，对照默认标签（v10
+那一套；这份考卷没有咨询师标签）。
+
+- **bf16**：发布的 `model.safetensors`（版本 `4ed505f9d8b346051133e1342e87b4cd95fa3881`），经 MLX，温度 0。
+- **q8**：随包的 `gguf/hamo-score-0.6b-v12.q8.gguf`，经 llama.cpp（Metal），用 `server/Modelfile` 的模板与中性采样（temperature 0、repeat_penalty 1.0、
+  top_k 0、top_p 1.0）。
+
+v12 这两列都不是 `run_exam.py` 跑出来的（判分公式相同，模型直接经 MLX 与 llama.cpp 调用），也没有经过 ollama 自己的
+程序。经 Docker 参考服务器里的 ollama，v12 在这份考卷上是 84.6%，Metal 上是 84.7%（见下面第一项）；v10h 经 Docker 里的 ollama 的读数
+也与 Metal 略有不同（见下一节第五项）。下一节列出的其余运行记录，同样都是 v10 与 v10h 的。v12 另有三项记录：经 Docker 参考服务器的一次运行、
+`run_exam.py` 对一个 ollama 兼容测试服务的端到端运行，以及一项经 ollama、用别的合成题的核对：
+
+- **经 Docker 参考服务器（v12，2026-11-13，Hugging Face 发布之后）**：一台 Apple 芯片的 Mac（Colima 里的 Docker，arm64 CPU，4 核 6 GiB，镜像已提前拉好），
+  用 0.5.0 的文件和空的 `model-cache` 卷执行 `docker compose up --build`：`setup` 从 Hugging Face 拉到 v12 的 GGUF，摘要一致，建模、预热，
+  启动后约 2 分 40 秒 `/healthz` 就绪。ollama 0.40.13 用的是 GGUF 自带的聊天模板，四个采样参数都是中性值。按上文的办法把 ollama 映射到
+  宿主机后跑 `python eval/run_exam.py --base-url http://127.0.0.1:11435`：维度级 84.6%（脚本打印 `A83% W79% E79% H93% B89%`），JSON 100%，
+  不同读数 80 种，P50 0.62 秒，闸门区 10/10，在 v12 的合格带内。
+
+- **`run_exam.py` 端到端（v12，2026-11-13，发布前）**：用 0.5.0 分支的代码、不改任何选项跑 `python eval/run_exam.py`，对着一个本地的
+  ollama 兼容测试服务（ollama 的 HTTP 接口后接 llama.cpp；它不是 ollama 本身），服务端上的 v12 q8 按 compose 文件自己的 create
+  请求建成。读数与上表 q8 一列一致：维度级 84.7%（脚本打印 `A83% W79% E79% H93% B89%`），JSON 100%，不同读数 81 种，
+  闸门区 10/10；195 条请求都带了采样参数。
+
+- **经 ollama 的服务端核对（v12，2026-11-13）**：一台 ARM CPU 服务器经 ollama，服务端提示词缓存关闭，模型已加载（不是最坏情况）。旧 B 卷与
+  旧 W 安全卷中的 138 题，按工具包规则截短：B 符号翻转 1/93（与 Metal 上判卷时是同一道题），「绝望但行动」W ≥ 1.5 为
+  45/45，没有无法解析的输出。为这次核对另抽的 100 道合成题，对 Metal 上的 llama.cpp：五个分数完全相同 96 题，五维都在
+  ±0.5 内 99 题（v10h 是 96 与 100）。
+
+**合格带。** 维度级 82–88%：取 v12 的参考值 84.7% 上下约 3 个点，与 2026-10-05 围绕 v10 的读数定 v10 的带是同一个
+办法。其余各条与 v10h 的带相同：各维 ≥ 75%、JSON ≥ 99%、闸门区 10/10、A ≥ 81。A 的下限仍在 v7 权重之上（这套标签上
+v7 的 A 为 80.5），但只高出一题，见下一段。v12 自己的读数也落在 v10h 的带（84–90%）内，靠近下沿。部署 v10h 的，
+仍按下一节 v10h 的带判。延迟取决于你的硬件，不属于合格带。
+
+**A 这条线余量很小，维度级这条线也拦不住 v7 权重。** v12 的 A 读 83.1（bf16 经 MLX、q8 经 llama.cpp + Metal 都是这个数）。
+这套标签的 A 走 v8 口径，v12 的 A 跟随咨询师第三轮的分；他们与旧口径不同的 A 分数带，列在模型的
+[技术档案](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#the-five-pulses-awehb)（模型卡里有链接）
+的 The five pulses 一节。本卷每题约 0.5 个点：v12 比下限 81 多 4 题；v7 权重在 llama.cpp + Metal 上 A 为 80.5，比下限少
+1 题，经 Docker 里的 ollama、模型已预热时是 81.0，正好压线（见下一节）。脚本按整数百分比打印各维：v12 的 q8 打印
+`A83% W79% E79% H93% B89%`，而 v7 的 80.5 打印成 `A81%`，看上去压线过了。v7 权重的维度级在 Metal 上（bf16 经 MLX /
+q8 经 llama.cpp）是 83.3 / 83.5%，落在 v12 的带内；经 Docker 里的 ollama，它的维度级（83.8%）和 A（81.0）都在 v12 的带内。
+所以 A 要和 B 一起看：v12 的 B 是 87.7 / 88.7（bf16 / q8），v7 是 82.6 / 83.1（经 Docker 里的 ollama 是 84.1）。
+
+**这份考卷分不开 v12 与 v10h。** 两者的读数都落在对方的带内，A 也几乎相同（83.1 对 82.6）。在 llama.cpp + Metal 上，
+v12 的 W、E 比 v10h 低（q8：79.5、79.0 对 82.6、83.1），不同读数也少（q8：81 对 99 种）；这些差别在别的运行环境上是否
+还在，v12 没有量过。要确认跑的是哪个版本，核对 GGUF 的 sha256：v12 是
+`6db066985ff4b249acf6193b564bbce2a07d1dafe80532d041b043b869235c08`，更早版本的摘要列在 `server/docker-compose.yml` 顶部。
+
+**采样参数要手工核对。** 考卷每次请求都带中性采样参数，所以查不出 Modelfile 漏写了它们（见下一节「这份考卷查不出
+Modelfile 漏写采样参数」一段，以及排查第 0 条）。
+
+**Basis.** Both columns use the toolkit's own `build_prompt()` and `parse_scores()`, up to 80 new
+tokens per question, graded against the default labels (v10's set; this exam has no counselor
+labels).
+
+- **bf16**: the released `model.safetensors` (revision `4ed505f9d8b346051133e1342e87b4cd95fa3881`) through MLX at
+  temperature 0.
+- **q8**: the shipped `gguf/hamo-score-0.6b-v12.q8.gguf` through llama.cpp with Metal, using the
+  `server/Modelfile` template and neutral sampling (temperature 0, repeat_penalty 1.0, top_k 0,
+  top_p 1.0).
+
+Neither v12 column came from `run_exam.py` (same grading formula, with the model called directly
+through MLX and llama.cpp), and neither ran through ollama's own binary. Through ollama, on the
+Docker reference server, v12 reads 84.6% on this exam against 84.7% on Metal (the first item
+below); v10h's readings through ollama on Docker also differed slightly from Metal (the fifth item
+in the next section). The other runs listed in the next section are likewise v10's and v10h's.
+Three more runs are recorded for v12: one through the Docker reference server, `run_exam.py` end to
+end against an ollama-compatible test server, and a check through ollama on other synthetic items:
+
+- **Through the Docker reference server (v12, 2026-11-13, after Hugging Face publication)**: one
+  Apple-silicon Mac (Docker under Colima, arm64 CPU, 4 CPUs and 6 GiB, images already pulled).
+  `docker compose up --build` with the 0.5.0 files and an empty `model-cache` volume: `setup`
+  fetched v12's GGUF from Hugging Face, the digest matched, the model was created and warmed, and
+  `/healthz` answered about 2 min 40 s after the start. ollama 0.40.13 used the GGUF's own chat
+  template, with the four sampling parameters neutral. With ollama mapped to the host as described
+  above, `python eval/run_exam.py --base-url http://127.0.0.1:11435`: dimension-level 84.6% (printed
+  `A83% W79% E79% H93% B89%`), JSON 100%, 80 distinct read-outs, P50 0.62 s, gate section 10/10,
+  inside v12's band.
+
+- **`run_exam.py` end to end (v12, 2026-11-13, before publication)**: `python eval/run_exam.py` from
+  the 0.5.0 branch with unchanged options, against a local ollama-compatible test server (llama.cpp
+  behind ollama's HTTP API; it is not ollama itself) serving the v12 q8, created with the compose
+  file's own create payload. It matched the q8 column above: dimension-level 84.7% (printed
+  `A83% W79% E79% H93% B89%`), JSON 100%, 81 distinct read-outs, gate section 10/10; all 195
+  requests carried the sampling options.
+
+- **Serving check through ollama (v12, 2026-11-13)**: an ARM CPU server running ollama, with the
+  server's prompt cache off and the model loaded (not a worst case). On 138 items of the old B and old W safety exams, with the
+  toolkit's prompt trimming: B sign flips 1/93 (the same item as on Metal), despair-plus-action
+  W ≥ 1.5 on 45/45, no unparseable output. On 100 synthetic items drawn for this check, against
+  llama.cpp on Metal: identical five-score read-out on 96 and all five within ±0.5 on 99 (v10h: 96
+  and 100).
+
+**The band.** Dimension-level 82–88%: v12's reference reading of 84.7%, plus or minus about 3
+points, the way v10's band was set around v10's reading on 2026-10-05. The other lines are v10h's:
+each dimension ≥ 75%, JSON ≥ 99%, gate section 10/10, A ≥ 81. The A floor still sits above v7
+weights (A 80.5 on these labels), by one question; see the next paragraph. v12's own reading sits
+inside v10h's band (84–90%) too, near its bottom. If you serve v10h, keep judging it by v10h's band
+in the next section. Latency depends on your hardware and is not part of the band.
+
+**The A floor has little margin, and the dimension-level floor does not stop v7 weights.** v12 reads
+83.1 on A (the same from bf16 through MLX and from q8 through llama.cpp with Metal). A on these
+labels follows rubric v8, while v12's A follows the counselors' third-round scores; their A bands
+that differ from the earlier rubric are listed under The five pulses in the model's
+[technical record](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#the-five-pulses-awehb)
+(linked from the model card). Each question is worth about 0.5 points: v12 is 4 questions over the
+floor of 81; v7 weights read A 80.5 on llama.cpp with Metal, 1 question under it, and 81.0 through
+ollama on Docker with the model warmed, exactly on it (next section). The script prints each
+dimension as a whole percent: v12's q8 prints `A83% W79% E79% H93% B89%`, and v7's 80.5 prints as
+`A81%`, which looks like a pass. v7's dimension-level reading on Metal (bf16 through MLX / q8
+through llama.cpp) is 83.3 / 83.5%, inside v12's band; through ollama on Docker its dimension-level
+reading (83.8%) and its A (81.0) are both inside v12's band. So read A together with B: v12's B is
+87.7 / 88.7 (bf16 / q8), v7's 82.6 / 83.1 (84.1 through ollama on Docker).
+
+**This exam does not separate v12 from v10h.** Each reads inside the other's band, and their A is
+almost the same (83.1 against 82.6). On llama.cpp with Metal v12 reads lower on W and E (q8: 79.5
+and 79.0 against 82.6 and 83.1) and gives fewer distinct read-outs (q8: 81 against 99); whether
+these differences hold on other runtimes was not measured for v12. To confirm which version you
+serve, check the GGUF's sha256: v12's is
+`6db066985ff4b249acf6193b564bbce2a07d1dafe80532d041b043b869235c08`, and the digests of earlier
+versions are at the top of `server/docker-compose.yml`.
+
+**Sampling has to be checked by hand.** The exam sends neutral sampling with every request, so it
+cannot catch a Modelfile that omits it (see "The exam cannot catch a Modelfile that omits the
+sampling parameters" in the next section, and check 0 below).
+
 ## 官方参考数字 · Official reference (v10h, 默认标签 · default labels)
+
+**部署 v10h 的按这一节判。** v10h 是 2026-10-31 至 2026-11-13（UTC）的默认权重；它的参考值与合格带都没有变
+（v12 的在上一节）。
+
+**If you serve v10h, judge it by this section.** v10h was the default from 2026-10-31 to
+2026-11-13 (UTC); its reference and band are unchanged (v12's are in the previous section).
 
 | 指标 · Metric | bf16（MLX） | q8（llama.cpp + Metal） | 合格带 · Pass band |
 |---|---|---|---|
@@ -162,14 +328,14 @@ v10h 的架构、量化和文件大小与 v10 相同。
   对 llama.cpp + Metal，同样 195 题：
   模型已预热时五个分数完全相同 184 题，五维都在 ±0.5 内 195 题；从刚加载的状态开始是 182 与 194 题。缓存关闭、模型已预热时，ollama
   0.32.5、0.40.12、0.40.13 在这 195 题上的回答逐字节相同。这些运行用的是 GGUF 自带的聊天模板，不是上表 q8 一列经 llama.cpp
-  用的 `server/Modelfile` 模板（见 [FAQ](../docs/faq.md)）。上述差异的原因没有查。compose 固定用 `ollama/ollama:0.40.13`，就是上面 0.40.13 那些运行所用的镜像（摘要相同）。这是一台机器上的一次记录，没有 x86 上的记录。
+  用的 `server/Modelfile` 模板（见 [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)）。上述差异的原因没有查。compose 固定用 `ollama/ollama:0.40.13`，就是上面 0.40.13 那些运行所用的镜像（摘要相同）。这是一台机器上的一次记录，没有 x86 上的记录。
 
 **合格带。** 维度级 84–90% 定于 2026-10-05，v10h 沿用（参考值 86.7%，上下约 3 个点）。A 的下限 2026-10-30 按
 v10h 定为 81；v10 仍是 86（见「部署的是 v10、v9 或 v7？」）。延迟取决于你的硬件，不属于合格带。
 
 **A 这条线余量很小。** v10h 的 A 读 82.6，v10 读 91.8（bf16 经 MLX、q8 经 llama.cpp + Metal 都是这两个数；经 Docker 里的
 ollama，即上面第五项的环境，模型已预热时是 82.1 与 92.3）：这套标签的 A 走 v8 口径，v10h 的 A 跟随咨询师复核（见
-[模型卡](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)）。在 llama.cpp + Metal 上，A 的下限
+[技术档案](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#the-five-pulses-awehb)的 The five pulses 一节）。在 llama.cpp + Metal 上，A 的下限
 高于 v7 权重（这套标签上 A 为 80.5），但本卷每题约 0.5 个点：v7 比下限少 1 题，v10h 只比下限多 3 题。经 Docker 里的
 ollama，模型已预热时，v7 的 A 是 81.0（158/195），正好压线，v10h（160/195）只比下限多 2 题，所以在那里 A 的下限单独分不开这两个版本。
 维度级的下限 84 在这一遍里分开了（v7 83.8），但差距小于模型状态本身带来的 0.3 个点（v10h 86.7 对 86.4），不要只靠它，还要比 B。
@@ -237,7 +403,7 @@ Docker; v10h has the same architecture, quantization and file size.
   warmed, 182 and 194 from a fresh load. With the cache off and the model warmed, ollama 0.32.5,
   0.40.12 and 0.40.13 gave byte-identical answers on all 195. These runs use the GGUF's own chat template, not the
   `server/Modelfile` template that the q8 column used through llama.cpp (see the
-  [FAQ](../docs/faq.md)). The cause of these differences was not investigated. Compose pins
+  [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)). The cause of these differences was not investigated. Compose pins
   `ollama/ollama:0.40.13`, the image of the 0.40.13 runs above
   (same digest). This is one record on one machine; there
   is no x86 run.
@@ -249,8 +415,8 @@ v7?"). Latency depends on your hardware and is not part of the band.
 **The A floor has little margin.** v10h reads 82.6 on A against v10's 91.8 (the same two figures
 from bf16 through MLX and from q8 through llama.cpp with Metal; through ollama on Docker, the setup
 of the fifth item above, with the model warmed, they are 82.1 and 92.3): A on these labels
-follows rubric v8, and v10h's A follows the counselor review (see the
-[model card](https://huggingface.co/HamoAI/hamo-score-0.6b#limitations--known-residuals)). On
+follows rubric v8, and v10h's A follows the counselor review (see The five pulses in the
+[technical record](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#the-five-pulses-awehb)). On
 llama.cpp with Metal the A floor sits above v7 weights (A 80.5 on these labels), but each question
 is worth about 0.5 points: v7 is 1 question under the floor and v10h only 3 over it. Through ollama
 on Docker, warmed, v7 reads A 81.0 (158 of 195), exactly on the floor, and v10h (160 of 195) is 2
@@ -277,19 +443,21 @@ run is exactly a server whose own sampling was not neutral, and it still read 87
 
 | 标签集 · Label set | 恒定输出 0.5 · constant 0.5 | 全输出 0 · all zeros | B 标签为 0 的题数 · B labels equal to 0（of 195） |
 |---|---|---|---|
-| `--labels v10h`、`--labels v10` | 77.9% | 68.1% | 38 |
+| `--labels v12`、`--labels v10h`、`--labels v10` | 77.9% | 68.1% | 38 |
 | `--labels v9` | 84.9% | 75.9% | 154 |
 | `--labels pre_v9` | 77.4% | 68.8% | 60 |
 
-下表是各版本权重在三套标签上的维度级一致率，测法同上一节（bf16 经 MLX；q8 为各版本随包 GGUF，经 llama.cpp +
+下表是各版本权重在三套标签上的维度级一致率，测法同前两节（bf16 经 MLX；q8 为各版本随包 GGUF，经 llama.cpp +
 Metal）。粗体是权重与标签对得上的格子。
 
 Dimension-level agreement of each version's weights on the three label sets, measured as in the
-previous section (bf16 through MLX; q8 each version's shipped GGUF through llama.cpp + Metal).
+two previous sections (bf16 through MLX; q8 each version's shipped GGUF through llama.cpp + Metal).
 Bold cells are the ones where weights and labels match.
 
-| 权重 · Weights | `labels`（`v10h`、`v10`） | 其中 A · B · of which A · B | `labels_v9` | `labels_pre_v9` |
+| 权重 · Weights | `labels`（`v12`、`v10h`、`v10`） | 其中 A · B · of which A · B | `labels_v9` | `labels_pre_v9` |
 |---|---|---|---|---|
+| v12 bf16 | **84.7%** | 83.1 · 87.7 | 78.3% | 81.8% |
+| v12 q8 | **84.7%** | 83.1 · 88.7 | 77.6% | 81.5% |
 | v10h bf16 | **86.8%** | 82.6 · 90.3 | 80.7% | 82.9% |
 | v10h q8 | **86.7%** | 82.6 · 90.3 | 80.7% | 82.9% |
 | v10 bf16 | **87.3%** | 91.8 · 87.2 | 83.1% | 84.1% |
@@ -299,56 +467,77 @@ Bold cells are the ones where weights and labels match.
 | v7 bf16 | 83.3% | 80.5 · 82.6 | 80.1% | **83.5%** |
 | v7 q8 | 83.5% | 80.5 · 83.1 | 80.2% | **83.8%** |
 
-- **合格带只对粗体格有意义**（v10h 的带见上一节，v10、v9、v7 的见「部署的是 v10、v9 或 v7？」）。v10h 没有
-  自己的标签，它的粗体格用的是 v10 的标签。其他格子量的是两套口径的距离，不是接线，也不是模型好坏；按列也排
-  不出名次（`labels_pre_v9` 一列上 v10 权重读得比 v7 权重高）。
-- **套错版本的权重比恒定输出更难发现。** 恒定输出 0.5 在 v10 标签上是 77.9%，离下限 84% 约 6 个点；v7 权重
-  是 83.3 / 83.5%，差不到 1 个点（A 与 B 怎么看，见上一节）；v9 权重看 B（57.4）。**v10 权重过得了 v10h 的带**
-  （87.3%，A 91.8），所以过关证明不了你已经换到 v10h，要看 A：v10h 82.6，v10 91.8。`pre_v9` 也分不出：v10
-  权重配 `--labels pre_v9` 是 84.1 / 84.3%，落在 v7 的带内；v10h 权重是 82.9%，维度级同样在带内，A（75.4 / 74.9）
-  压在各维 ≥ 75 的线上。所以 `pre_v9` 过关证明不了你跑的是 v7——要确认权重版本，用默认标签看 A 和 B。
-- **W、E、H 的标签列分不出版本**（这三列标签自 2026-08-16 没变）；读数上 v10h 与 v10 有差别（W 82.6 对 79.5），
-  认版本仍以 A 为准；195 题里 165 题的 H 标签是 0，H 高说明不了什么。
-- **判卷逻辑没变**：0.4.0 只给同一套标签加了名字 `v10h`。这次只量了 v10h 那两行；v7、v9 的四个粗体格是
-  0.3.0 发布时重新跑的，与更早发布的参考值相同。
+- **合格带只对粗体格有意义**（v12 与 v10h 的带见前两节，v10、v9、v7 的见「部署的是 v10、v9 或 v7？」）。v12 和
+  v10h 都没有自己的标签，它们的粗体格用的是 v10 的标签。其他格子量的是两套口径的距离，不是接线，也不是模型好坏；
+  按列也排不出名次（`labels_pre_v9` 一列上 v10 权重读得比 v7 权重高）。
+- **套错版本的权重比恒定输出更难发现。** 恒定输出 0.5 在 v10 标签上是 77.9%，比 v12 的下限 82% 低约 4 个点，比
+  v10h 和 v10 的下限 84% 低约 6 个点；v7 权重是 83.3 / 83.5%，落在 v12 的带内，比 v10h 和 v10 的下限低不到 1 个点
+  （A 与 B 怎么看，见前两节）；v9 权重看 B（57.4）。**v10 和 v10h 的权重都过得了 v12 的带**（87.3%、86.7%），v12 的
+  读数也落在 v10h 的带内，所以过关证明不了你已经换到 v12。A 分得出 v10（91.8；v12 83.1，v10h 82.6），分不出 v12 与
+  v10h（见「官方参考数字（v12）」一节）。`pre_v9` 也分不出：v10 权重配 `--labels pre_v9` 是 84.1 / 84.3%，落在 v7 的
+  带内；v10h 权重是 82.9%，维度级同样在带内，A（75.4 / 74.9）贴着各维 ≥ 75 这条线；v12 权重是 81.8 / 81.5%
+  （bf16 / q8），也在 v7 的带（81–86%）内，A 77.4，B 79.0 / 78.5。所以 `pre_v9` 过关证明不了你跑的是 v7——要确认权重
+  版本，用默认标签看 A 和 B，并核对 GGUF 的摘要。
+- **W、E、H 的标签列分不出版本**（这三列标签自 2026-08-16 没变）。读数上有差别：v12 的 W、E 比 v10h 低（q8：79.5、
+  79.0 对 82.6、83.1），v10h 与 v10 的 W 也不同（82.6 对 79.5）；A 分得出 v10，分不出 v12 与 v10h。195 题里 165 题的
+  H 标签是 0，H 高说明不了什么。
+- **判卷逻辑没变**：0.4.0 给同一套标签加了名字 `v10h`，0.5.0 又加了 `v12`。v12 那两行是这次量的，v10h 那两行是 0.4.0
+  发布时量的；v7、v9 的四个粗体格是 0.3.0 发布时重新跑的，与更早发布的参考值相同。
 - **同分布，但没有咨询师标签**：标签出自给 v10 训练数据打标的同一套教师提示词，这份考卷按构造就与 v10 同分布。
-  v10h 的合成训练标签是复核后的分数，这份考卷没有复核，所以它量不到 v10h 离咨询师有多近。过关说明你的部署与考卷标签的一致程度和参考值相当、`num_predict` 没有设得过小，走的是工具包自己的提示词、采样与解析器，不是你的。它说明不了你跑的是哪个版本（v10 权重也过得了 v10h 的带），也不检查聊天模板和 `stop`：在 ollama 0.40.13 上，60 道题里缺了这两项的 ollama 标签读数相同。这两项用 `ollama show <tag> --template` 和 `--parameters` 核对。86.7% 不是准确率，
-  也不要拿这份考卷给版本排名（v10h 比 v10 略低，说明不了谁更好）。
+  v10h 和 v12 的合成训练标签是咨询师复核的分数（v10h 用第一轮，v12 用第三轮），这份考卷没有经过复核，所以它量不到
+  它们离咨询师有多近。过关说明你的部署与考卷标签的一致程度和参考值相当、`num_predict` 没有设得过小，走的是工具包自己的提示词、采样与解析器，不是你的。它说明不了你跑的是哪个版本（v10h 和 v10 的权重也过得了 v12 的带），也不检查聊天模板和 `stop`：在 ollama 0.40.13 上（用 v10h 测的），60 道题里缺了这两项的 ollama 标签读数相同。这两项用 `ollama show <tag> --template` 和 `--parameters` 核对。84.7% 不是准确率，
+  也不要拿这份考卷给版本排名（v12 读得比 v10h 和 v10 低，说明不了谁更好）。
 
-- **A band applies to bold cells only** (v10h's band is in the previous section; v10's, v9's and
-  v7's under "Serving v10, v9 or v7?"). v10h has no labels of its own: its bold cells use v10's.
-  Any other cell measures the distance between two rubrics, not your wiring and not model quality;
-  columns do not rank models either (in the `labels_pre_v9` column v10 weights read higher than v7
-  weights).
+- **A band applies to bold cells only** (v12's and v10h's bands are in the two previous sections;
+  v10's, v9's and v7's under "Serving v10, v9 or v7?"). v12 and v10h have no labels of their own:
+  their bold cells use v10's. Any other cell measures the distance between two rubrics, not your
+  wiring and not model quality; columns do not rank models either (in the `labels_pre_v9` column
+  v10 weights read higher than v7 weights).
 - **Weights of the wrong version are harder to spot than a constant output.** A constant 0.5
-  reads 77.9% on the v10 labels, about 6 points under the floor of 84%; v7 weights read
-  83.3 / 83.5%, less than a point under (for how to read A and B, see the previous section); for
-  v9 weights look at B (57.4). **v10 weights pass v10h's band** (87.3%, A 91.8), so a pass does
-  not prove you have moved to v10h: look at A, 82.6 for v10h and 91.8 for v10. `pre_v9` does not
-  separate either: v10 weights with `--labels pre_v9` read 84.1 / 84.3%, inside v7's band, and
-  v10h weights read 82.9%, also inside on the dimension-level number, with A (75.4 / 74.9) on the
-  line of each dimension ≥ 75. So a pass with `pre_v9` does not prove you are serving v7 — to
-  confirm which weights are served, run the default labels and look at A and B.
+  reads 77.9% on the v10 labels, about 4 points under v12's floor of 82% and about 6 under the 84%
+  floor of v10h and v10; v7 weights read 83.3 / 83.5%, inside v12's band and less than a point
+  under the floor of v10h and v10 (for how to read A and B, see the two previous sections); for v9
+  weights look at B (57.4). **v10 and v10h weights both pass v12's band** (87.3%, 86.7%), and v12's
+  reading is inside v10h's band, so a pass does not prove you have moved to v12. A separates v10
+  (91.8; v12 83.1, v10h 82.6) but not v12 from v10h (see "Official reference (v12)"). `pre_v9` does
+  not separate either: v10 weights with `--labels pre_v9` read 84.1 / 84.3%, inside v7's band; v10h
+  weights read 82.9%, also inside on the dimension-level number, with A (75.4 / 74.9) on the line of
+  each dimension ≥ 75; v12 weights read 81.8 / 81.5% (bf16 / q8), inside v7's band (81–86%) as
+  well, with A 77.4 and B 79.0 / 78.5. So a pass with `pre_v9` does not prove you are serving v7 —
+  to confirm which weights are served, run the default labels, look at A and B, and check the
+  GGUF's digest.
 - **The W, E and H label columns do not separate versions** (they have not changed since
-  2026-08-16). Read-outs differ a little between v10h and v10 (W 82.6 against 79.5), but use A to
-  tell them apart; 165 of the 195 H labels are 0, so a high H says little.
-- **The grading logic is unchanged**: 0.4.0 only adds the name `v10h` for the same labels. Only
-  the two v10h rows were measured for this release; the four bold cells for v7 and v9 were re-run
-  for 0.3.0 and equal the references published before it.
+  2026-08-16). Read-outs differ: v12 reads lower than v10h on W and E (q8: 79.5 and 79.0 against
+  82.6 and 83.1), and v10h and v10 differ on W (82.6 against 79.5); A separates v10, but not v12
+  from v10h. 165 of the 195 H labels are 0, so a high H says little.
+- **The grading logic is unchanged**: 0.4.0 added the name `v10h` for the same labels, and 0.5.0
+  adds `v12`. The two v12 rows were measured for this release and the two v10h rows for 0.4.0; the
+  four bold cells for v7 and v9 were re-run for 0.3.0 and equal the references published before it.
 - **In-distribution, but no counselor labels**: the labels come from the same teacher prompts as
-  v10's training labels, so this exam is in-distribution for v10 by construction. v10h's synthetic
-  training labels are the review's scores and this exam was not reviewed, so it cannot show how
-  close v10h is to the counselors. A pass shows that your deployment agrees with the exam's labels about as well as the reference does, and that `num_predict` is not too small, through the toolkit's own prompt, sampling and parser, not yours. It does not show which version you serve (v10 weights also pass v10h's band), and it does not check the chat template or `stop`: on ollama 0.40.13 tags without them read the same on 60 questions. Check those with `ollama show <tag> --template` and `--parameters`. 86.7% is not an accuracy
-  figure, and this exam must not be used to rank versions (v10h reading slightly under v10 says
+  v10's training labels, so this exam is in-distribution for v10 by construction. The synthetic
+  training labels of v10h and v12 are scores from the counselor review (v10h's from its first
+  round, v12's from its third), and this exam was not reviewed, so it cannot show how close either
+  is to the counselors. A pass shows that your deployment agrees with the exam's labels about as well as the reference does, and that `num_predict` is not too small, through the toolkit's own prompt, sampling and parser, not yours. It does not show which version you serve (v10h and v10 weights also pass v12's band), and it does not check the chat template or `stop`: on ollama 0.40.13 (measured with v10h) tags without them read the same on 60 questions. Check those with `ollama show <tag> --template` and `--parameters`. 84.7% is not an accuracy
+  figure, and this exam must not be used to rank versions (v12 reading under v10h and v10 says
   nothing about which is better).
 
 ## 自检通过 ≠ 模型通过验收 · Passing this exam is not model acceptance
 
-**v10h 的预注册在训练前冻结，主要问题是：它是否比 v10 更接近咨询师的复核？在 978 道留出的合成题上，
-答案是肯定的。** 注册还沿用了 v10 的 18 项检查，v10h 过了 17 项。没过的是 **G5a**；G5a 和 G5b 定义在真实终评
-（453 轮假名化的内部员工对话，不公开）的轮次上，都是危机处理的替代指标。创始人裁定危机处理不归本模型，由模型
-外围的确定性代码（Hamo 称之为「脊柱」）负责，注册因此把这两项定为只报告。其余 16 项全部通过。主要问题的比较和
-这 16 项的表见模型的[技术档案](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)（模型卡里有链接）的
+**v12 的预注册在训练前冻结，主要问题是：它是否比 v10h 更接近咨询师第三轮的分？在 978 道留出的合成题上，
+答案是肯定的。** 计入结论的 15 项检查里，13 项达标。没达标的 **G6a**、**G6c** 比的是真实终评（453 轮假名化的
+内部员工对话，不公开）上 W、E、H 与参照标签的差距，两项都只差一点：相差不超过 0.5 的判断 1,195 个，通过线
+1,199；比参照标签低超过 0.5 的 121 个，通过线 120。按注册，这种结果逐项交给创始人定，他两项都接受了。另有三项
+只报告：G5a、G5b 是危机处理的替代指标，创始人裁定危机处理不归本模型；G8 的前提被创始人对训练标签的一项决定
+取代了。主要问题的比较和检查表见技术档案的
+[v12: main question and checks](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#v12-main-question-and-checks)
+一节；模型卡和技术档案都不报告 G5a、G5b 的数值。与咨询师的比较只在合成消息上：真实对话没有咨询师分数，第三轮的分
+也没有逐行抽查。
+
+**v10h 的验收状态（保留作历史；仍在部署 v10h 的请看这一段）。** v10h 的预注册在训练前冻结，主要问题是：它是否
+比 v10 更接近咨询师的复核（第一轮）？在 978 道留出的合成题上，答案是肯定的。注册还沿用了 v10 的 18 项检查，
+v10h 过了 17 项。没过的是 **G5a**；G5a 和 G5b 定义在真实终评的轮次上，都是危机处理的替代指标。创始人裁定危机
+处理不归本模型：危机处理由模型外围、先于模型运行的脊柱负责（「脊柱」是 Hamo 对这一层的叫法）。注册因此把这两项定为只报告。其余 16 项全部通过。
+主要问题的比较和这 16 项的表见[技术档案](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)的
 Evaluation 一节；模型卡和技术档案都不报告 G5a、G5b 的数值。与咨询师的比较只在合成消息上：真实对话没有咨询师
 分数；在真实终评上，以参照评分器为准，v10h 与 v10 打平。
 
@@ -360,16 +549,19 @@ Evaluation 一节；模型卡和技术档案都不报告 G5a、G5b 的数值。�
 通过；依这项裁决，模型卡和技术档案都不报告 G5a、G5b 两项（G5b 过了）。
 
 - **已知的一条 B 符号翻转**：「行，我全听你的，你说哪天去就哪天去。」（无上下文）这句自我消融，v10 打
-  B 2.5，v7 与 v9 打 0（随包 q8，llama.cpp + Metal）；v10h 打 0（随包 q8、经 MLX 的 bf16、经 transformers 的
-  bf16 都是）。这一句打回了 0，但翻转没有消失：在答案 B 为 0 的题上，v10h 自我消融题池 4/438、全部 4/596，
-  都在预注册上限内。这句话就是此前模型卡用来说明「仪器不能把自我消融读成边界」的例子。计数与细节见
-  [FAQ](../docs/faq.md)。
-- **它不是危机检测器，也不是诊断工具。** 它的分数，包括 W 在内，没有一个是危机信号；危机处理由先于模型运行的
-  确定性代码负责。
+  B 2.5，v7 与 v9 打 0（随包 q8，llama.cpp + Metal）；v10h 和 v12 打 0（随包 q8、经 MLX 的 bf16、经 transformers 的
+  bf16 都是；v12 去掉句号也是 0）。这一句打回了 0，但翻转没有消失，v12 还比 v10h 多：在答案 B 为 0 的题上，v12
+  自我消融题池 7/438、全部 8/596（v10h 4/438、4/596），也就是说 8 条翻转里有 7 条落在自我消融题池里；这些计数都在预注册上限内。
+  真实终评上，参照 B 为 0 的 166 轮里打到 B ≥ 2 的，v12 是 5 轮（v10h 13 轮）。这句话就是此前模型卡用来说明「仪器
+  不能把自我消融读成边界」的例子。计数与细节见
+  [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)。
+- **它不是危机检测器，也不是诊断工具。** 它的分数，包括 W 在内，没有一个是危机信号；危机处理由模型外围、先于
+  模型运行的脊柱负责。
 
-**本考卷看不到以上任何一条**：卷里没有咨询师标签，也没有真实对话的轮次，而 G5a 定义在真实轮次上；评分区也没有
-自我消融的对照题。它同样考不到明确意念规则（v10 的标签规则；v10h 的合成训练标签不再套用，以复核为准）：评分区
-没有明确意念的题（冻结的意念检测器在 195 题上命中 0 题）。教师 W ≥ 2.5 的题只有 6 道，不足以左右是否合格。
+**本考卷看不到以上任何一条**：卷里没有咨询师标签，也没有真实对话的轮次，而 G6a、G6c 与 G5a 都定义在真实轮次上；
+评分区也没有自我消融的对照题。它同样考不到明确意念规则（v10 的标签规则；v10h 和 v12 的合成训练标签不再套用，
+以咨询师的分为准）：评分区没有明确意念的题（冻结的意念检测器在 195 题上命中 0 题）。教师 W ≥ 2.5 的题只有 6 道，
+不足以左右是否合格。
 
 无论哪个版本，面向消费者的心理健康部署都必须在模型上游用独立机制处理危机与自伤内容（许可证 §3(c)）；我们
 建议用确定性的，比如工具包的 `CrisisGate`。但它只是一张关键词表：闸门区的 10/10 只说明那 10 条手写用例没
@@ -377,16 +569,30 @@ Evaluation 一节；模型卡和技术档案都不报告 G5a、G5b 的数值。�
 189 道「想死但求助」合成题上，它命中 107 题（56.6%）。请按你服务的人群扩充词表，不要把它当成
 完整的危机识别。
 
-**v10h's registration, frozen before training, asked one main question: is it closer to the
-counselor review than v10? On 978 held-out synthetic items the answer is yes.** It also carried
-over v10's 18 checks and met 17. The one it did not meet, **G5a**, and G5b were defined on turns of
-the real final exam (453 turns of pseudonymised internal staff conversations, not public) as
-stand-ins for crisis handling. The registration made both report-only, because the founder ruled
-crisis handling outside this model: it is done by deterministic code around the model (Hamo calls
-it "the spine"). The other 16 all passed. The main comparison and the table of the 16 are in the
-Evaluation section of the model's
-[technical record](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation)
-(linked from the model card); neither it nor the model card reports the values of G5a and G5b. The
+**v12's registration, frozen before training, asked one main question: is it closer to the
+counselors' third-round scores than v10h? On 978 held-out synthetic items the answer is yes.** Of
+its 15 operative checks it met 13. The two it missed, **G6a** and **G6c**, compare its W, E and H
+with the reference labels on the real final exam (453 turns of pseudonymised internal staff
+conversations, not public), and both missed narrowly (1,195 judgments within ±0.5 against a line
+of 1,199; 121 more than 0.5 below against a line of 120). The registration sends that
+outcome to the founder item by item, and he accepted both. Three further checks were report-only:
+G5a and G5b, stand-ins for crisis handling, which the founder ruled outside this model; and G8,
+whose premise a founder decision on the training labels replaced. The main comparison and the
+table of checks are in the technical record's
+[v12: main question and checks](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#v12-main-question-and-checks);
+neither it nor the model card reports the values of G5a and G5b. The counselor comparison is on
+synthetic messages only: real conversations have no counselor scores, and the third-round scores
+were not spot-checked row by row.
+
+**v10h's acceptance status (kept as history; it still applies if you serve v10h).** v10h's
+registration, frozen before training, asked one main question: is it closer to the counselor review
+(its first round) than v10? On 978 held-out synthetic items the answer is yes. It also carried over
+v10's 18 checks and met 17. The one it did not meet, **G5a**, and G5b were defined on turns of the
+real final exam as stand-ins for crisis handling. The registration made both report-only, because
+the founder ruled crisis handling outside this model. Crisis handling is the job of the spine
+(Hamo's name for the layer around its models), which runs before the model. The other 16 all
+passed. The main comparison and the table of the 16 are in the Evaluation section of the
+[technical record](https://huggingface.co/HamoAI/hamo-score-0.6b/blob/main/TECHNICAL_RECORD.md#evaluation); neither it nor the model card reports the values of G5a and G5b. The
 counselor comparison is on synthetic messages only: real conversations have no counselor scores,
 and on the real final exam v10h ties v10 against the reference scorer.
 
@@ -403,21 +609,25 @@ the model card reports G5a and G5b (G5b was met).
 
 - **A known B sign flip**: the self-erasure sentence 「行，我全听你的，你说哪天去就哪天去。」 ("Fine,
   I'll do whatever you say — we go whichever day you say."), with no context, is scored B 2.5 by
-  v10 and B 0 by v7 and v9 (shipped q8 files, llama.cpp + Metal); v10h scores it B 0 (shipped q8,
-  bf16 through MLX, bf16 through transformers). That sentence is back at 0, but flips remain: on
-  items whose B should be 0, v10h flips 4 of 438 in the self-erasure pool and 4 of 596 overall,
-  both inside the registered caps. This sentence is the example earlier model cards used for "the
-  instrument must not read self-erasure as a boundary". Counts and details:
-  [FAQ](../docs/faq.md).
+  v10 and B 0 by v7 and v9 (shipped q8 files, llama.cpp + Metal); v10h and v12 score it B 0
+  (shipped q8, bf16 through MLX, bf16 through transformers; v12 also without the full stop). That
+  sentence is back at 0, but flips remain, and v12 has more than v10h: on items whose B should be 0,
+  v12 flips 7 of 438 in the self-erasure pool and 8 of 596 overall (v10h: 4 and 4), so 7 of
+  its 8 flips are self-erasure items; all of these counts are inside the registered caps. On the real final exam v12 scores B 2 or
+  more on 5 of the 166 turns whose reference B is 0 (v10h: 13). This sentence is the example
+  earlier model cards used for "the instrument must not read self-erasure as a boundary". Counts
+  and details:
+  [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md).
 - **It is not a crisis detector and not a diagnostic tool.** None of its scores, W included, is a
-  crisis signal; crisis handling is done by deterministic code that runs before the model.
+  crisis signal; crisis handling is the job of the spine (Hamo's name for the layer around its
+  models), which runs before the model.
 
 **This exam can see none of the above**: it has no counselor labels and no real conversation
-turns, and G5a was defined on real turns; its scoring section has no self-erasure pairs. Nor does
-it exercise the explicit-ideation rule (a v10 labelling rule; v10h's synthetic training labels no
-longer apply it, the review stands): the scoring section has no explicit-ideation items (the
-frozen ideation detector flags 0 of the 195 questions). Six questions carry a teacher W ≥ 2.5, too
-few to decide a pass.
+turns, and G6a, G6c and G5a were defined on real turns; its scoring section has no self-erasure
+pairs. Nor does it exercise the explicit-ideation rule (a v10 labelling rule; the synthetic training
+labels of v10h and v12 no longer apply it, and the counselors' scores stand): the scoring section
+has no explicit-ideation items (the frozen ideation detector flags 0 of the 195 questions). Six
+questions carry a teacher W ≥ 2.5, too few to decide a pass.
 
 Whatever the version, a consumer-facing mental-wellness deployment must handle crisis and
 self-harm content with an independent mechanism upstream of the model (license §3(c)); we
@@ -432,20 +642,25 @@ population you serve, and do not treat the gate as complete crisis detection.
 
 **更正。** 0.2.0 的这一页让 v9 用户「重调压力权重与分桶阈值」，这个建议不够：v9 的 crisp B 在多数普通消息上
 是 0，参照压力公式里 B 的负权重乘的是 0，减压项就没了——真实终评 453 轮上（随包 q8，llama.cpp + Metal），
-平均每轮原始压力变化按 v9 的读数是 +0.37，按参照标签是 −0.68（v10h −0.63，v10 −0.72），重调阈值或 B 的权重都修不回来。
-把分数喂给 B 为负权重的公式（工具包的 `update_stress()` 就是）的，请用 v10h 或 v10，或退回 v7；完整说明见
-[集成指南里关于 v9 的更正](../docs/integration.md#更正重调阈值修不好-v9)。本考卷只检查接线，不替你校准压力权重和分桶阈值。
+平均每轮原始压力变化按 v9 的读数是 +0.37，按参照标签是 −0.68（v12 −0.61，v10h −0.63，v10 −0.72），重调阈值或 B 的权重都
+修不回来。把分数喂给 B 为负权重的公式（工具包的 `update_stress()` 就是）的，请用 v12、v10h 或 v10，或退回 v7；完整说明见
+[集成指南里关于 v9 的更正](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#更正重调阈值修不好-v9)。本考卷只检查接线，不替你校准压力权重和分桶阈值。
 
 **Correction.** The 0.2.0 version of this page told v9 users to re-tune stress weights and bucket
 cut-offs. That advice was not enough: v9's crisp B is 0 on most ordinary messages, so the
 negative B weight of the reference stress formula multiplies a zero and the relief term
 disappears — on the 453 turns of the real final exam (shipped q8 files, llama.cpp + Metal) the
 mean raw per-turn stress change is +0.37 from v9's read-outs against −0.68 from the reference
-labels (v10h −0.63, v10 −0.72) — and re-tuning the cut-offs or the B weight cannot repair that. If
-you feed scores into a formula with a negative B weight (the toolkit's `update_stress()` is one),
-use v10h or v10, or go back to v7; the full statement is in the
-[integration guide's correction on v9](../docs/integration.md#correction-re-tuning-thresholds-does-not-repair-v9).
+labels (v12 −0.61, v10h −0.63, v10 −0.72) — and re-tuning the cut-offs or the B weight cannot
+repair that. If you feed scores into a formula with a negative B weight (the toolkit's
+`update_stress()` is one), use v12, v10h or v10, or go back to v7; the full statement is in the
+[integration guide's correction on v9](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#correction-re-tuning-thresholds-does-not-repair-v9).
 This exam checks wiring; it does not calibrate stress weights or bucket cut-offs for you.
+
+部署 v10h 的，参考值与合格带见「官方参考数字（v10h）」一节，判卷用 `--labels v10h`。下表是更早的版本。
+
+If you serve v10h, its reference and band are under "Official reference (v10h)"; grade with
+`--labels v10h`. The table below covers earlier versions.
 
 | | v10（2026-10-06 至 2026-10-31 的默认权重 · the default weights from 2026-10-06 to 2026-10-31） | v9（2026-09-30 至 10-06 的默认权重 · the default weights from 2026-09-30 to 2026-10-06） | v7 |
 |---|---|---|---|
@@ -455,7 +670,7 @@ This exam checks wiring; it does not calibrate stress weights or bucket cut-offs
 | 分维参考 · Per-dimension reference（A · W · E · H · B） | bf16 91.8 · 79.0 · 85.1 · 93.3 · 87.2；q8 91.8 · 79.5 · 85.6 · 93.3 · 86.2 | bf16 91.3 · 80.0 · 85.6 · 91.8 · 95.9；q8 91.8 · 80.0 · 86.7 · 92.3 · 95.9 | bf16 84.6 · 79.5 · 82.1 · 91.8 · 79.5；q8 84.6 · 79.5 · 82.1 · 92.3 · 80.5 |
 | 合格带 · Band（另要求各维 ≥ 75%、JSON ≥ 99%、闸门 10/10 · plus each dimension ≥ 75%, JSON ≥ 99%, gate 10/10） | 84–90%，A ≥ 86 | 86–92% | 81–86% |
 
-- 摘要、safetensors 固定版本与回退步骤见[集成指南](../docs/integration.md#固定版本与回退)；
+- 摘要、safetensors 固定版本与回退步骤见[集成指南](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#固定版本与回退)；
   `server/docker-compose.yml` 顶部列了这三个版本的文件名与摘要。
 - **v10**：`--labels v10` 与默认算出的数字相同，要紧的是按 v10 的带判：A ≥ 86，这条下限用来分出 v7 权重（A 80.5）。
   不同读数种类参考值 75 / 78（bf16 / q8）；在一台 Apple 芯片的 Mac 上（Colima 里的 Docker，arm64 CPU，ollama 0.40.13）
@@ -466,7 +681,7 @@ This exam checks wiring; it does not calibrate stress weights or bucket cut-offs
 - **v10、v9 与 v7**：上游的危机处理同样不能省（见上一节）。
 
 - Digests, pinned safetensors revisions and rollback steps are in the
-  [integration guide](../docs/integration.md#pins-and-rollback); the top of
+  [integration guide](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/integration.md#pins-and-rollback); the top of
   `server/docker-compose.yml` lists the file names and digests of these three versions.
 - **v10**: `--labels v10` gives the same numbers as the default; what matters is judging by v10's
   band: A ≥ 86, the floor that separates v10 weights from v7 weights (A 80.5). Reference distinct
@@ -482,13 +697,14 @@ This exam checks wiring; it does not calibrate stress weights or bucket cut-offs
 
 ## 量化档位怎么选 · Choosing a quantization
 
-**v10h 的量化档位我们只量过随包的 Q8_0**（文件名里的 q8）：18 项验收检查就是在这个文件上跑的。下面
-Q6_K / Q4_K_M 的数字全部来自 v7 权重；v10、v9 也只量过 Q8_0。
+**v12 的量化档位我们只量过随包的 Q8_0**（文件名里的 q8）：v12 的验收检查都是在这个文件上跑的。下面
+Q6_K / Q4_K_M 的数字全部来自 v7 权重；v10h、v10、v9 也只量过 Q8_0。
 
 **同一组权重，两个文件。** `model.safetensors`（bf16）与随包 GGUF 是同一组平均权重，GGUF 由
-`convert_hf_to_gguf.py --outtype q8_0` 转出。本考卷上两者是 86.8% 与 86.7%，但逐题不能当成互换：在 v10 上量过，
-本卷 195 题里五个分数完全相同的有 176 题（90.3%），技术档案列出的另外四份考卷上是 93.7–96.2%；v10h 在本卷上是 179 题
-（91.8%），其余考卷见技术档案的 Evaluation 一节。部署 safetensors 的，参考 bf16 一列（经 MLX 测得；本卷没有经 transformers 跑过）。
+`convert_hf_to_gguf.py --outtype q8_0` 转出。v12 的两者在本考卷上都是 84.7%，各维略有不同（见「官方参考数字（v12）」），
+逐题不能当成互换：v12 的两者在本卷 195 题里五个分数完全相同的有 174 题（89.2%），190 题五个分数都在 ±0.5 内。在 v10 上量过，本卷 195 题里五个分数完全相同的有 176 题（90.3%），技术档案列出的
+另外四份考卷上是 93.7–96.2%；v10h 在本卷上是 179 题（91.8%），其余考卷见技术档案的 Evaluation 一节。部署 safetensors
+的，参考 bf16 一列（经 MLX 测得；本卷没有经 transformers 跑过）。
 
 **自己重转，哈希对不上是正常的。** 这一段是在 v10 上核对的（llama.cpp `748d4225`）：在我们的构建目录里重转，
 得到的文件与随包 GGUF 逐字节相同；从模型仓库下载后重转则不同：310 个张量全部逐字节相同，但转换器会把文件夹名和
@@ -496,22 +712,24 @@ Q6_K / Q4_K_M 的数字全部来自 v7 权重；v10、v9 也只量过 Q8_0。
 是构建标签（v10 是 `V10S1_Tailavg`），没有许可证字段；模型许可证照样适用。
 
 **社区量化档**（[mradermacher](https://huggingface.co/mradermacher/hamo-score-0.6b-GGUF)，感谢）是 2026-08-05
-由 **v4 权重**制作的，比 v10h 落后五个发布版本（v6.1、v7、v9、v10、v10h）：A 用旧口径，早于 W 安全修复与明确意念
-规则。我们没有对它们的有效测量：本页早先那张拿 v6.1 的 Q8_0 去比这些 v4 档的对比表量到的是版本差，已撤回。
+由 **v4 权重**制作的，比 v12 落后六个发布版本（v6.1、v7、v9、v10、v10h、v12）：A 用旧口径，早于 W 安全修复与明确
+意念规则。我们没有对它们的有效测量：本页早先那张拿 v6.1 的 Q8_0 去比这些 v4 档的对比表量到的是版本差，已撤回。
 下面的建议不涵盖它们。
 
-**The shipped Q8_0 (the q8 of the file name) is the only v10h quantization we have measured**: it
-is the file the 18 acceptance checks ran on. The Q6_K / Q4_K_M numbers below come from v7
-weights; on v10 and v9, too, Q8_0 is the one quantization we measured.
+**The shipped Q8_0 (the q8 of the file name) is the only v12 quantization we have measured**: it
+is the file v12's acceptance checks ran on. The Q6_K / Q4_K_M numbers below come from v7 weights;
+on v10h, v10 and v9, too, Q8_0 is the one quantization we measured.
 
 **One set of weights, two files.** `model.safetensors` (bf16) and the shipped GGUF hold the same
-averaged weights; the GGUF is `convert_hf_to_gguf.py --outtype q8_0` of them. On this exam they
-read 86.8% and 86.7%, but do not treat them as interchangeable item by item: measured on v10, they
-give the identical five-score read-out on 176 of this exam's 195 questions (90.3%) and on
-93.7–96.2% of items on the four other exams listed in the technical record. On v10h it is 179 of
-195 here (91.8%); its other exams are in the Evaluation section of the technical record. If you serve the safetensors, the
-bf16 column is the nearest reference: it was measured through MLX, and this exam was not run
-through transformers.
+averaged weights; the GGUF is `convert_hf_to_gguf.py --outtype q8_0` of them. On this exam v12's
+two both read 84.7%, with small differences per dimension (see "Official reference (v12)"), and
+they are not interchangeable item by item: v12's two give the identical five-score read-out on 174 of
+this exam's 195 questions (89.2%), and all five within ±0.5 on 190. Measured on v10, they give the
+identical five-score read-out on 176 of this exam's 195 questions (90.3%) and on 93.7–96.2% of
+items on the four other exams listed in the technical record; on v10h it is 179 of 195 here
+(91.8%), and its other exams are in the Evaluation section of the technical record. If you serve
+the safetensors, the bf16 column is the nearest reference: it was measured through MLX, and this
+exam was not run through transformers.
 
 **If you re-convert, expect a different hash.** This was checked on v10 (llama.cpp `748d4225`):
 re-converting our build directory reproduces the shipped GGUF byte for byte; converting a download
@@ -522,7 +740,7 @@ tensors or outputs, not hashes. `general.name` in the shipped header is a build 
 
 **The community builds** by
 [mradermacher](https://huggingface.co/mradermacher/hamo-score-0.6b-GGUF) (thank you) were made on
-2026-08-05 from the **v4 weights**, five releases behind v10h (v6.1, v7, v9, v10, v10h): they score
+2026-08-05 from the **v4 weights**, six releases behind v12 (v6.1, v7, v9, v10, v10h, v12): they score
 A under the old rubric and predate the W safety repair and the explicit-ideation rule. We have no
 valid measurement of them: the earlier comparison on this page of a v6.1 Q8_0 against these v4
 builds measured a version gap and was withdrawn. The recommendation below does not cover them.
@@ -539,7 +757,7 @@ Q6_K 与 Q4_K_M 由我们用 llama.cpp 从 v7 的 f16 GGUF 量化。同一提示
 各档经 llama.cpp（Metal）、中性采样。
 
 在 v7 上，Q6_K 与 Q8_0 接近。Q4_K_M 决策级只低 0.4 个点，但在参照 W ≥ 2.5 的 37 轮上
-单边压低 W。**状态桶粗到足以吸收一个被压低的信号，只看一致率发现不了这件事。** v10、v10h 的低比特档在这些
+单边压低 W。**状态桶粗到足以吸收一个被压低的信号，只看一致率发现不了这件事。** v10、v10h、v12 的低比特档在这些
 轮次上会怎样，没有量过。
 
 **建议。** 读数要把关行为的，用随包 **Q8_0**。**Q6_K / Q4_K_M** 我们不发布：自己量化后，先跑
@@ -552,7 +770,7 @@ bf16 through MLX (temperature 0), the GGUF builds through llama.cpp with Metal, 
 
 On v7, Q6_K tracks Q8_0. Q4_K_M loses only 0.4 points decision-level, but it damps W
 one-sidedly on the 37 turns with reference W ≥ 2.5. **State buckets are coarse enough to absorb a
-damped signal; agreement alone does not show it.** What a lower-bit v10 or v10h build does on
+damped signal; agreement alone does not show it.** What a lower-bit v10, v10h or v12 build does on
 these turns is unmeasured.
 
 **Recommendation.** Where read-outs gate behaviour, use the shipped **Q8_0**. We publish no
@@ -563,35 +781,35 @@ compensate. The upstream crisis requirement holds at any quantization. On v7 we 
 below Q4_K_M; assume anything unmeasured is worse.
 
 ```bash
-# 1. 已发布的权重：HF 格式，main 即 v10h → f16 GGUF · released weights, HF format, main is v10h → f16 GGUF
-python llama.cpp/convert_hf_to_gguf.py <v10h-weights-dir> --outtype f16 --outfile hamo-score-0.6b-v10h.f16.gguf
+# 1. 已发布的权重：HF 格式，main 即 v12 → f16 GGUF · released weights, HF format, main is v12 → f16 GGUF
+python llama.cpp/convert_hf_to_gguf.py <v12-weights-dir> --outtype f16 --outfile hamo-score-0.6b-v12.f16.gguf
 # 2. f16 → 目标档位 · f16 → target quant（Q6_K 或 or Q4_K_M）
-llama-quantize hamo-score-0.6b-v10h.f16.gguf hamo-score-0.6b-v10h.q4_k_m.gguf Q4_K_M
+llama-quantize hamo-score-0.6b-v12.f16.gguf hamo-score-0.6b-v12.q4_k_m.gguf Q4_K_M
 # 3. 每档复制一份 server/Modelfile，只改 FROM · one copy of server/Modelfile per build, change only FROM
-#    （原文件的 FROM 是 · the shipped FROM is /tmp/hamo/gguf/hamo-score-0.6b-v10h.q8.gguf）
+#    （原文件的 FROM 是 · the shipped FROM is /tmp/hamo/gguf/hamo-score-0.6b-v12.q8.gguf）
 cp server/Modelfile Modelfile.q4
 ollama create hamo-q8 -f server/Modelfile
 ollama create hamo-q4 -f Modelfile.q4
 python eval/compare_quants.py --models hamo-q8 hamo-q4
 ```
 
-运行 `ollama create hamo-q4` 之前，把 `Modelfile.q4` 的 FROM 改成你的 ...v10h.q4_k_m.gguf。`hamo-q8` 是随包的 v10h Q8_0，作为基准，放在前面。
+运行 `ollama create hamo-q4` 之前，把 `Modelfile.q4` 的 FROM 改成你的 ...v12.q4_k_m.gguf。`hamo-q8` 是随包的 v12 Q8_0，作为基准，放在前面。
 
-Before the `ollama create hamo-q4` line, edit FROM in `Modelfile.q4` to your ...v10h.q4_k_m.gguf.
-`hamo-q8`, the shipped v10h Q8_0, is the reference build and comes first.
+Before the `ollama create hamo-q4` line, edit FROM in `Modelfile.q4` to your ...v12.q4_k_m.gguf.
+`hamo-q8`, the shipped v12 Q8_0, is the reference build and comes first.
 
 `compare_quants.py` 在本仓库的合成考卷上跑各档（零真实数据），除各档一致率外，还输出**方向性衰减表**：每个
 维度「更低 / 更高」的题数，以及高退缩题（教师 W ≥ 1.5）上 W 更低 / 更高的题数与各档 W 均值。单边分布就是
-结论。一致率默认对照 v10 那套标签（本卷没有咨询师标签，默认的 `--labels v10h` 与 `--labels v10` 是同一套）；
-比 v9 各档加 `--labels v9`，比 v7 各档加 `--labels pre_v9`。只比同一版本的档位，跨版本量出的是版本差。
+结论。一致率默认对照 v10 那套标签（本卷没有咨询师标签，默认的 `--labels v12` 与 `--labels v10h`、`--labels v10` 是
+同一套）；比 v9 各档加 `--labels v9`，比 v7 各档加 `--labels pre_v9`。只比同一版本的档位，跨版本量出的是版本差。
 
 `compare_quants.py` runs the synthetic exam (no real data) across builds and prints, besides
 per-build agreement, a **directional attenuation table**: lower / higher counts per dimension,
 and, on high-withdrawal questions (teacher W ≥ 1.5), W lower / higher counts and each build's
 mean W. A one-sided split is the finding. Agreement is graded against v10's label set by default
-(this exam has no counselor labels: the default `--labels v10h` and `--labels v10` are the same
-labels); pass `--labels v9` for v9 builds and `--labels pre_v9` for v7 builds. Compare builds of
-one version; across versions the script measures a version gap.
+(this exam has no counselor labels: the default `--labels v12`, `--labels v10h` and `--labels v10`
+are the same labels); pass `--labels v9` for v9 builds and `--labels pre_v9` for v7 builds. Compare
+builds of one version; across versions the script measures a version gap.
 
 ## 数字不对时 · If your numbers are off
 
@@ -600,38 +818,46 @@ one version; across versions the script measures a version gap.
 0. **先查采样参数，而且要手工查——这份考卷看不到它。** `ollama show <model> --parameters` 必须看到
    `repeat_penalty 1`；你自己的服务也要随请求带上 temperature 0、repeat_penalty 1.0、top_k 0、top_p 1.0。
    `repeat_penalty 1.1`（ollama 0.32.9 及以前的默认值，0.32.10 起为 1.0）会惩罚本模型输出里重复的 `0.0`，把分数推离 0。
-   随包 v10 q8 实测（旧 B 卷，legacy 答案，
-   300 道合成题，不在本仓库；llama.cpp + Metal），只把 repeat_penalty 从 1.0 改成 1.1：造分（应打低的题
+   随包 v12 q8 实测（旧 B 卷，legacy 答案，300 道合成题，不在本仓库；llama.cpp + Metal），只把 repeat_penalty
+   从 1.0 改成 1.1：300 题里 146 题的读数变了。原本为 0 的分被推离 0 的，W 193 题中 58 题，E 237 题中 23 题，H 236 题中
+   8 题，A 208 题中 4 题，B 38 题中 3 题；W 平均 0.35 → 0.53，E 0.21 → 0.29。legacy 答案视为没有边界的 104 题里，
+   B ≥ 1.0 的从 18 题增至 25 题；B 符号翻转 93 题中 1 → 2 题；成对方向正确 59/60 → 58/60。v12 的合成训练答案是咨询师第三轮的分，
+   不是按这份 legacy 答案的口径打的；这里比较的是 repeat_penalty 从 1.0 改成 1.1 带来的变化。随包 v10 q8 用同一份考卷实测：造分（应打低的题
    打到 B ≥ 1.0）3/104（2.9%）→ 15/104（14.4%）；B 符号翻转 93 题中 2 → 4 题；成对方向正确 59/60 → 58/60；
    漏判（应打高的题打到 B ≤ 0.5）21/180（11.7%）→ 12/180（6.7%），这个「下降」是同一股上推，不是改进。
    更早版本按当时发布的数字（llama.cpp，CPU；同一批题，legacy 答案）：v7 造分 2.9% → 8.7%、符号翻转
    0 → 1；v6.1 造分 13.5% → 25.0%、符号翻转 6 → 10。v9 按其模型卡发布的数字（crisp 答案）：造分
    1.9% → 2.8%。各次测量的运行环境与答案不同，幅度不能互相比较；方向每次都一样。
-1. **维度级在 80–84% 上下，JSON 与闸门区都正常** → 多半是权重与标签套错了，对照交叉读数表：
+1. **维度级在 78–84% 上下，或 A、B 离你所部署版本的参考值很远，JSON 与闸门区都正常** → 多半是权重与标签套错了，
+   对照交叉读数表：
    - B 只有 57 左右：v9 权重配了默认标签，工具包已升级（0.3.0 起）、服务仍是 v9 时最常见。加 `--labels v9`，
-     或把服务换成 v10h。
-   - A 只有 80 左右（脚本打印 `A81%`）、B 83 左右：v7 权重配了默认标签。加 `--labels pre_v9`，或把服务换成
-     v10h。
+     或把服务换成 v12。
+   - A 只有 80 左右（脚本打印 `A81%`）、B 83 左右：v7 权重配了默认标签。它的维度级落在 v12 的带内，只能靠 A 和 B
+     认出来（v12 q8 是 A 83.1、B 88.7）。加 `--labels pre_v9`，或把服务换成 v12。
    - 约 83%、A 92 左右：v10 权重配了 `--labels v9`（83.1% / 82.9%）。去掉这个开关。
    - 约 81%、A 83 左右、B 60 左右：v10h 权重配了 `--labels v9`（80.7%）。去掉这个开关。
+   - 约 78%、A 83 左右、B 54 左右：v12 权重配了 `--labels v9`（78.3% / 77.6%）。去掉这个开关。
    - 约 83%、A 75 左右：v10h 权重配了 `--labels pre_v9`（82.9%）。去掉这个开关。
+   - 约 82%、A 77 左右：v12 权重配了 `--labels pre_v9`（81.8% / 81.5%）。去掉这个开关。
 
    核对三处：Modelfile 的 `FROM` 指向哪个 GGUF，服务实际调用哪个模型标签，命令行带了哪个 `--labels`。
 2. **JSON 合法率 < 99%** → 先查 `num_predict`（随包是 80）：在 ollama 0.40.13 上，`num_predict` 设成 20 的 ollama 标签在 60 道题上
    JSON 合法率是 0%。在 ollama 0.32.5、0.40.12、0.40.13 上，默认设置下用 v10h 的 GGUF 时，Modelfile 的模板不是原因：它们会存下
-   `server/Modelfile` 的模板，但实际用 GGUF 自带的聊天模板（见 [FAQ](../docs/faq.md)）。在 0.40.13 上，Modelfile 里去掉空 `<think>`
+   `server/Modelfile` 的模板，但实际用 GGUF 自带的聊天模板（见 [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)）。在 0.40.13 上，Modelfile 里去掉空 `<think>`
    块什么也没变（60 题，0 条解析失败，同样 85.7%）。设了 `OLLAMA_GO_TEMPLATE=1` 时 ollama 用你写的模板，再去掉这个块，模型也会自己写出它
    （195 题，JSON 100%）。在确实采用你写的模板的运行环境上，接着查模板。温度由考卷随请求发送为 0，只有服务端不采纳请求参数时才出问题（第 3 条）。
-3. **维度级明显低于 84% 且不是第 1 条，或脚本提示不同读数太少**（全卷少于 19 种，即近乎恒定输出；v10h
-   参考值 97 / 99）→ 服务端跑的多半不是随包 q8 的原样部署：GGUF 不对，模板与 `server/Modelfile` 不同（只在确实采用
+3. **维度级明显低于你所部署版本的下限（v12 是 82%，v10h 与 v10 是 84%）且不是第 1 条，或脚本提示不同读数太少**
+   （全卷少于 19 种，即近乎恒定输出；参考值 v12 77 / 81，v10h 97 / 99）→ 服务端跑的多半不是随包 q8 的原样部署：GGUF 不对，模板与 `server/Modelfile` 不同（只在确实采用
    你写的模板的运行环境上才算，见第 2 条），
    用了没量过的量化档，或服务端不采纳请求参数（此时生效的是它自己的采样默认值）。考卷用的是工具包的
    `build_prompt()` 与 `parse_scores()`，查不出你自己服务里的提示词、采样与解析——那些要另外对照
    `build_prompt()` 核对。
 4. **闸门区 ≠ 10/10** → 你运行的 `hamo_score` 里 `CrisisGate` 的词表被改动了（这一节在进程内直接跑闸门）。
    许可证 §3(c) 要求在模型上游用独立机制处理危机与自伤内容；修复后再上线。
-5. **数字在带内，但版本不对** → 看 A。A 92 左右、不同读数 75–80 种：跑的还是 v10，它过得了 v10h 的带；要用 v10h
-   就换 GGUF（核对第 1 条那三处）。A 83 左右却没过 86：跑的是 v10h，你拿了 v10 的带，换成 v10h 的带。
+5. **数字在带内，但版本不对** → 看 A。A 92 左右、不同读数 75–80 种：跑的还是 v10，它过得了 v12 和 v10h 的带；要用 v12
+   就换 GGUF（核对第 1 条那三处）。A 83 左右却没过 86：跑的是 v12 或 v10h，你拿了 v10 的带，换成你所部署版本的带。
+   v12 与 v10h 靠 A 分不开（83.1 对 82.6），合格带也分不开；在 llama.cpp + Metal 上，v12 的 W、E 更低（79.5、79.0 对
+   82.6、83.1），不同读数更少（81 对 99 种）。要确定，核对 GGUF 的 sha256（见「官方参考数字（v12）」）。
 
 Large deviations from the band are usually wiring, not the model. Check in this order.
 
@@ -639,26 +865,36 @@ Large deviations from the band are usually wiring, not the model. Check in this 
    `ollama show <model> --parameters` must show `repeat_penalty 1`, and your own service must
    send temperature 0, repeat_penalty 1.0, top_k 0 and top_p 1.0 as well. `repeat_penalty 1.1`,
    ollama's default through 0.32.9 (1.0 from 0.32.10), penalises the repeated `0.0` in this model's
-   output and pushes scores away from zero. Measured
-   on the shipped v10 q8 (old B exam, legacy key, 300 synthetic questions, not shipped here;
-   llama.cpp + Metal), changing only repeat_penalty from 1.0 to 1.1: fabrication (items that
-   should score low, scored B ≥ 1.0) 3/104 (2.9%) → 15/104 (14.4%); B sign flips 2 → 4 of 93;
-   pair direction 59/60 → 58/60; misses (items that should score high, scored B ≤ 0.5) 21/180
-   (11.7%) → 12/180 (6.7%) — that drop is the same upward push, not an improvement. Earlier
+   output and pushes scores away from zero. Measured on the shipped v12 q8 (old B exam, legacy
+   key, 300 synthetic questions, not shipped here; llama.cpp + Metal), changing only repeat_penalty
+   from 1.0 to 1.1 changed 146 of the 300 read-outs and pushed scores off 0: W on 58 of the 193
+   items where it was 0, E on 23 of 237, H on 8 of 236, A on 4 of 208, B on 3 of 38; mean W
+   0.35 → 0.53, E 0.21 → 0.29. On the 104 items the legacy key treats as no-boundary, B at 1.0 or
+   more went from 18 to 25; B sign flips 1 → 2 of 93; pair direction 59/60 → 58/60. v12's synthetic
+   training answers are the counselors' third-round scores, not answers under this legacy key; what
+   is compared here is the change from repeat_penalty 1.0 to 1.1. Measured on the shipped v10 q8 with the same exam: fabrication (items that should
+   score low, scored B ≥ 1.0) 3/104 (2.9%) → 15/104 (14.4%); B sign flips 2 → 4 of 93; pair
+   direction 59/60 → 58/60; misses (items that should score high, scored B ≤ 0.5) 21/180 (11.7%)
+   → 12/180 (6.7%) — that drop is the same upward push, not an improvement. Earlier
    versions, as published at the time (llama.cpp on CPU; same questions, legacy key): v7
    fabrication 2.9% → 8.7%, sign flips 0 → 1; v6.1 fabrication 13.5% → 25.0%, sign flips 6 → 10.
    As published on the v9 card (crisp key): v9 fabrication 1.9% → 2.8%. These occasions differ in
    runtime and answer key, so their effect sizes are not comparable; the push is in the same
    direction each time.
-1. **Dimension-level around 80–84% with JSON and the gate section fine** usually means weights
-   and labels are mismatched. Compare with the cross table:
+1. **Dimension-level around 78–84%, or A and B far from the reference of the version you serve,
+   with JSON and the gate section fine** usually means weights and labels are mismatched. Compare
+   with the cross table:
    - B near 57: v9 weights on the default labels — the common case after upgrading the toolkit
-     (from 0.3.0 on) while still serving v9. Pass `--labels v9`, or serve v10h.
-   - A near 80 (the script prints `A81%`) with B near 83: v7 weights on the default labels. Pass
-     `--labels pre_v9`, or serve v10h.
+     (from 0.3.0 on) while still serving v9. Pass `--labels v9`, or serve v12.
+   - A near 80 (the script prints `A81%`) with B near 83: v7 weights on the default labels. Their
+     dimension-level number is inside v12's band, so only A and B give them away (v12 q8: A 83.1,
+     B 88.7). Pass `--labels pre_v9`, or serve v12.
    - About 83% with A near 92: v10 weights with `--labels v9` (83.1% / 82.9%). Drop the flag.
    - About 81% with A near 83 and B near 60: v10h weights with `--labels v9` (80.7%). Drop the flag.
+   - About 78% with A near 83 and B near 54: v12 weights with `--labels v9` (78.3% / 77.6%). Drop
+     the flag.
    - About 83% with A near 75: v10h weights with `--labels pre_v9` (82.9%). Drop the flag.
+   - About 82% with A near 77: v12 weights with `--labels pre_v9` (81.8% / 81.5%). Drop the flag.
 
    Check three things: which GGUF your Modelfile's `FROM` points to, which model tag your service
    calls, and which `--labels` you passed.
@@ -666,15 +902,16 @@ Large deviations from the band are usually wiring, not the model. Check in this 
    0.40.13 a tag with 20 gave JSON 0% on 60 questions. On ollama 0.32.5, 0.40.12 and 0.40.13, with
    default settings and the v10h GGUF, a Modelfile template is not the cause: they store the
    template from `server/Modelfile` but serve the GGUF's own chat template instead (see the
-   [FAQ](../docs/faq.md)). On 0.40.13, removing the empty `<think>` block from a Modelfile changed
+   [FAQ](https://github.com/HamoAI/hamo-score-toolkit/blob/main/docs/faq.md)). On 0.40.13, removing the empty `<think>` block from a Modelfile changed
    nothing (0 parse failures and the same 85.7% on 60 questions). With `OLLAMA_GO_TEMPLATE=1` ollama
    serves your template, and with the block removed the model wrote it itself (JSON 100% on 195
    questions). On a runtime that does apply your template, check the template next. The exam sends
    temperature 0 itself, so temperature can only be wrong on a server that ignores request options
    (case 3).
-3. **Dimension-level clearly below 84% and not case 1, or the script warns of few distinct
-   read-outs** (fewer than 19 on the full exam, that is, close to a constant output; the v10h
-   reference has 97 / 99): the server is most likely not running the shipped q8 as shipped:
+3. **Dimension-level clearly below the floor of the version you serve (82% for v12, 84% for v10h
+   and v10) and not case 1, or the script warns of few distinct read-outs** (fewer than 19 on the
+   full exam, that is, close to a constant output; the references have 77 / 81 for v12 and 97 / 99
+   for v10h): the server is most likely not running the shipped q8 as shipped:
    the wrong GGUF, a chat template that differs from `server/Modelfile` (only on
    a runtime that applies your template; see case 2), an
    unmeasured quantization, or a server that ignores request options (its own sampling defaults
@@ -686,6 +923,9 @@ Large deviations from the band are usually wiring, not the model. Check in this 
    independent mechanism upstream of the model for crisis and self-harm content; fix it before
    going live.
 5. **Numbers inside the band, wrong version**: look at A. A near 92 with 75–80 distinct read-outs
-   means you are still serving v10, which passes v10h's band; to serve v10h, swap the GGUF (the
-   three things in case 1). A near 83 that fails a floor of 86 means you are serving v10h and
-   using v10's band; use v10h's.
+   means you are still serving v10, which passes v12's and v10h's bands; to serve v12, swap the GGUF
+   (the three things in case 1). A near 83 that fails a floor of 86 means you are serving v12 or
+   v10h and using v10's band; use the band of the version you serve. A does not tell v12 from v10h
+   (83.1 against 82.6), and neither does the band; on llama.cpp with Metal v12 reads lower on W and
+   E (79.5 and 79.0 against 82.6 and 83.1) and gives fewer distinct read-outs (81 against 99). To be
+   sure, check the GGUF's sha256 (see "Official reference (v12)").

@@ -17,32 +17,37 @@ Runs two sections:
 Usage:
     python eval/run_exam.py                       # ollama on localhost
     python eval/run_exam.py --base-url http://myhost:11434 --model my-tag
+    python eval/run_exam.py --labels v10h         # same labels; checking a v10h deployment, against v10h's band
     python eval/run_exam.py --labels v10          # same labels; checking a v10 deployment, against v10's band
     python eval/run_exam.py --labels v9           # checking a v9 deployment on purpose
     python eval/run_exam.py --labels pre_v9       # checking a v7 deployment on purpose
 
-There are no counselor labels for this exam. v10h's synthetic training labels
-were re-scored by human counselors engaged by Hamo, but these 195 questions were
-not: the default label set is v10's, and --labels v10h (the default) and --labels
-v10 are two names for it. It follows the v10 rubrics: A under rubric v8, B under
-the legacy rubric. Each question also keeps its v9 labels (rubric-v8 A, crisp B)
-and its pre-v9 labels (old A, legacy B), which is what a v9 or a v7 deployment
-should be checked against — A changed meaning at v9, B changed at v9 and changed
-back at v10.
+There are no counselor labels for this exam. The synthetic training labels of
+v10h and v12 come from a review by human counselors engaged by Hamo (v12's from
+its third round), but these 195 questions were not reviewed: the default label
+set is v10's, and --labels v12 (the default), --labels v10h and --labels v10 are
+three names for it. It follows the v10 rubrics: A under rubric v8, B under the
+legacy rubric. Each question also keeps its v9 labels (rubric-v8 A, crisp B) and
+its pre-v9 labels (old A, legacy B), which is what a v9 or a v7 deployment should
+be checked against — A changed meaning at v9, B changed at v9 and changed back
+at v10.
 
-Reference on the default labels: v10h reads 86.7% (q8) / 86.8% (bf16). Band for a
-v10h deployment: 84-90%, each dimension >= 75%, A >= 81, JSON >= 99%, gate 10/10.
-A v10 deployment keeps v10's band: the same lines with A >= 86 (v10 reads 87.3%,
-A 91.8).
+Reference on the default labels: v12 reads 84.7% (q8 and bf16; q8 per dimension
+A 83.1, W 79.5, E 79.0, H 93.3, B 88.7). Band for a v12 deployment: 82-88%, each
+dimension >= 75%, A >= 81, JSON >= 99%, gate 10/10. A v10h deployment keeps
+v10h's band: 84-90% with the same other lines (v10h reads 86.7% q8 / 86.8%
+bf16). A v10 deployment keeps v10's band: 84-90% with the same other lines but
+A >= 86 (v10 reads 87.3%, A 91.8).
 
 What a pass covers: the exam always builds the prompt with the toolkit's
 build_prompt(), sends the toolkit's pinned sampling (SAMPLING_OPTIONS:
 temperature 0, repeat_penalty 1.0, top_k 0, top_p 1.0) with every request, and
 parses with parse_scores(). A pass therefore shows that your deployment agrees
 with the exam's labels about as well as the reference does, and that num_predict
-is not too small. It does not show which version you serve (v10 weights also pass v10h's
-band), and it does not check the chat template or stop: on ollama 0.40.13 tags
-without them read the same on 60 questions. Check those with
+is not too small. It does not show which version you serve (v10h and v10 weights
+also pass v12's band, and v12's reading sits inside v10h's band too, near its
+bottom), and it does not check the chat template or stop: on ollama 0.40.13,
+with v10h, tags without them read the same on 60 questions. Check those with
 `ollama show <tag> --template` and `--parameters`. Request options override the
 Modelfile, so this exam cannot catch a Modelfile that omits repeat_penalty 1.0,
 nor a prompt, sampling setting or parser in your own service — check those
@@ -55,17 +60,18 @@ template (only on a runtime that applies yours), a server that ignores request
 options, or an over-aggressive
 quantization — not a worse model. The dimension-level number alone is a thin
 check: on the default (v10) labels v7 weights read 83.3% (bf16) / 83.5% (q8),
-less than a point under the band's floor of 84%. Against v10's band their A
-(80.5, floor 86) gives them away. Against v10h's band it does not on the printed
+less than a point under the 84% floor of v10h's and v10's bands but inside
+v12's band (82-88%). Against v10's band their A (80.5, floor 86) gives them away.
+Against the A floor of 81 in v12's and v10h's bands it does not on the printed
 line: on llama.cpp with Metal the A floor sits above v7 weights (A 80.5 on these
 labels); through ollama on one Apple-silicon Mac (Docker under Colima, arm64 CPU,
 ollama 0.40.13), warmed, v7 reads A 81.0, exactly on the floor. The script prints
-A81% either way, so also check the dimension-level number and B
-(see eval/README.md). On the v9 label set a constant 0.5 already reads 84.9%
-(band 86-92%). The script prints the trivial baselines for the label set in use
-(v10 labels: constant 0.5 -> 77.9%, all zeros -> 68.1%) and warns when the
-deployment produced few distinct read-outs (a correctly served model produces
-several dozen on the full exam).
+A81% either way, so compare A and B with the reference of the version you mean
+to serve (v12 q8: A 83.1, B 88.7; see eval/README.md). On the v9 label set a
+constant 0.5 already reads 84.9% (band 86-92%). The script prints the trivial
+baselines for the label set in use (v10 labels: constant 0.5 -> 77.9%, all
+zeros -> 68.1%) and warns when the deployment produced few distinct read-outs
+(a correctly served model produces several dozen on the full exam).
 """
 from __future__ import annotations
 
@@ -89,9 +95,9 @@ def constant_agreement(exam, label_key, value):
         for d in "AWEHB")
 
 
-# label set -> key in synthetic_exam.jsonl. v10h is the default and shares v10's
-# key: this exam has no counselor labels.
-LABEL_KEYS = {"v10h": "labels", "v10": "labels", "v9": "labels_v9", "pre_v9": "labels_pre_v9"}
+# label set -> key in synthetic_exam.jsonl. v12 is the default; v12 and v10h share
+# v10's key: this exam has no counselor labels.
+LABEL_KEYS = {"v12": "labels", "v10h": "labels", "v10": "labels", "v9": "labels_v9", "pre_v9": "labels_pre_v9"}
 
 
 def main():
@@ -100,8 +106,8 @@ def main():
     ap.add_argument("--base-url", default="http://127.0.0.1:11434")
     ap.add_argument("--model", default="hamo-score-0.6b")
     ap.add_argument("--limit", type=int, default=0)
-    ap.add_argument("--labels", choices=list(LABEL_KEYS), default="v10h",
-                    help="label set to grade against: v10h (default) and v10 are two names for v10's labels"
+    ap.add_argument("--labels", choices=list(LABEL_KEYS), default="v12",
+                    help="label set to grade against: v12 (default), v10h and v10 are three names for v10's labels"
                          " (this exam has no counselor labels), v9 (for a v9 deployment) or pre_v9 (for a v7 deployment)")
     args = ap.parse_args()
     label_key = LABEL_KEYS[args.labels]
@@ -111,7 +117,7 @@ def main():
     exam = [json.loads(l) for l in open(os.path.join(HERE, "synthetic_exam.jsonl"), encoding="utf-8")]
     if args.limit:
         exam = exam[: args.limit]
-    # v10h names v10's labels: print them as v10's, so this line cannot read as counselor labels.
+    # v12 and v10h name v10's labels: print them as v10's, so this line cannot read as counselor labels.
     label_name = "v10" if label_key == LABEL_KEYS["v10"] else args.labels
     print(f"Section 1 — scoring exam: {len(exam)} questions, graded against {label_name} labels")
     per = {d: [] for d in "AWEHB"}
